@@ -1,16 +1,29 @@
+# ==========================================
+# 1. خدعة النينجا لحل مشكلة OpenCV في السيرفر
+# يجب أن تبقى هذه الأسطر في أعلى الملف دائماً
+# ==========================================
+import os
+try:
+    import cv2
+except ImportError:
+    os.system("pip uninstall -y opencv-python opencv-python-headless")
+    os.system("pip install opencv-python-headless")
+    import cv2
+
+# ==========================================
+# 2. استيراد باقي المكتبات وبدء التطبيق
+# ==========================================
 import streamlit as st
 from PIL import Image
 import numpy as np
-import cv2
 from ultralytics import YOLO
 from move_engine import CandyEngine 
-import os
 
 st.set_page_config(page_title="Candy Crush AI", layout="centered")
 st.title("🍬 العرّاف: مساعد كاندي كراش")
 st.markdown("---")
 
-# 1. تحميل النموذج
+# تحميل النموذج
 @st.cache_resource
 def load_model():
     model_path = "best.pt"
@@ -26,7 +39,7 @@ if model is None:
 
 st.sidebar.success("✅ النموذج جاهز للعمل!")
 
-# خريطة الألوان بناءً على الكود الذي استخدمناه في التدريب
+# خريطة الألوان
 class_map = {
     0: 'red', 1: 'blue', 2: 'green', 
     3: 'yellow', 4: 'orange', 5: 'purple', 

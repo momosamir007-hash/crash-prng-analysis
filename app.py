@@ -2,117 +2,139 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
-import plotly.express as px
 from plotly.subplots import make_subplots
 from scipy import stats
+import warnings
+warnings.filterwarnings('ignore')
 
 # ============================================================
 # إعداد الصفحة
 # ============================================================
 st.set_page_config(
-    page_title="نظام التنبؤ الذكي",
-    page_icon="🎯",
+    page_title="محلل الأنماط الإحصائي",
+    page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# CSS مخصص
 st.markdown("""
 <style>
-    /* تم إزالة direction: rtl من body و .main لمنع الشريط الجانبي من الانتقال لليمين وتجنب مشكلة الإغلاق في المنتصف */
-    .block-container {
-        direction: rtl;
-        text-align: right;
-    }
-    
-    p, h1, h2, h3, h4, h5, h6, span, div.stMarkdown, label { 
-        direction: rtl; 
-        text-align: right; 
-    }
-    
-    .metric-card {
-        background: linear-gradient(135deg, #1e3a5f, #2d6a9f);
-        border-radius: 12px;
-        padding: 20px;
-        text-align: center;
-        color: white;
-        margin: 5px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-    }
-    .metric-value {
-        font-size: 2.2em;
-        font-weight: bold;
-        color: #00d4ff;
-    }
-    .metric-label {
-        font-size: 0.95em;
-        color: #b0c4de;
-        margin-top: 5px;
-    }
-    
-    .prediction-box {
-        background: linear-gradient(135deg, #0d2137, #1a4a6b);
-        border: 2px solid #00d4ff;
-        border-radius: 15px;
-        padding: 25px;
-        text-align: center;
-        color: white;
-        margin: 10px 0;
-    }
-    .pred-value {
-        font-size: 3em;
-        font-weight: bold;
-        color: #00ff88;
-    }
-    .pred-range {
-        font-size: 1.1em;
-        color: #87ceeb;
-        margin-top: 8px;
-    }
-    
-    .confidence-high   { color: #00ff88; font-weight: bold; }
-    .confidence-medium { color: #ffa500; font-weight: bold; }
-    .confidence-low    { color: #ff4444; font-weight: bold; }
-    
-    .rec-box {
-        border-radius: 10px;
-        padding: 15px 20px;
+    body { direction: rtl; font-family: 'Segoe UI', sans-serif; }
+
+    .card {
+        background: linear-gradient(135deg, #0d1b2a, #1a3a5c);
+        border-radius: 14px;
+        padding: 22px;
         margin: 8px 0;
-        font-size: 1.05em;
+        border: 1px solid #1e4a7a;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.4);
     }
-    .rec-strong {
-        background: rgba(0,255,136,0.15);
-        border-left: 4px solid #00ff88;
+    .card-title {
+        color: #87ceeb;
+        font-size: 0.85em;
+        margin-bottom: 6px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    .card-value {
+        color: #00d4ff;
+        font-size: 2em;
+        font-weight: bold;
+    }
+    .card-sub {
+        color: #4a7a9b;
+        font-size: 0.8em;
+        margin-top: 4px;
+    }
+
+    .result-pass {
+        background: rgba(0,255,136,0.08);
+        border: 1px solid #00ff88;
+        border-radius: 10px;
+        padding: 14px;
+        margin: 6px 0;
         color: #00ff88;
     }
-    .rec-moderate {
-        background: rgba(255,165,0,0.15);
-        border-left: 4px solid #ffa500;
-        color: #ffa500;
-    }
-    .rec-weak {
-        background: rgba(255,68,68,0.15);
-        border-left: 4px solid #ff4444;
+    .result-fail {
+        background: rgba(255,68,68,0.08);
+        border: 1px solid #ff4444;
+        border-radius: 10px;
+        padding: 14px;
+        margin: 6px 0;
         color: #ff4444;
     }
-    
-    .warning-box {
-        background: rgba(255,165,0,0.1);
+    .result-warn {
+        background: rgba(255,165,0,0.08);
         border: 1px solid #ffa500;
-        border-radius: 8px;
-        padding: 12px;
+        border-radius: 10px;
+        padding: 14px;
+        margin: 6px 0;
         color: #ffa500;
-        margin: 8px 0;
     }
-    
+
+    .kelly-box {
+        background: linear-gradient(135deg, #0a2a1a, #0d4a2a);
+        border: 2px solid #00ff88;
+        border-radius: 14px;
+        padding: 24px;
+        text-align: center;
+    }
+    .kelly-value {
+        font-size: 2.8em;
+        font-weight: bold;
+        color: #00ff88;
+    }
+
+    .rec-strong {
+        background: rgba(0,255,136,0.10);
+        border-left: 4px solid #00ff88;
+        border-radius: 8px;
+        padding: 12px 16px;
+        margin: 6px 0;
+        color: #00ff88;
+    }
+    .rec-warn {
+        background: rgba(255,165,0,0.10);
+        border-left: 4px solid #ffa500;
+        border-radius: 8px;
+        padding: 12px 16px;
+        margin: 6px 0;
+        color: #ffa500;
+    }
+    .rec-danger {
+        background: rgba(255,68,68,0.10);
+        border-left: 4px solid #ff4444;
+        border-radius: 8px;
+        padding: 12px 16px;
+        margin: 6px 0;
+        color: #ff4444;
+    }
+
+    .section-title {
+        color: #00d4ff;
+        font-size: 1.4em;
+        font-weight: bold;
+        margin: 20px 0 10px 0;
+        padding-bottom: 6px;
+        border-bottom: 1px solid #1a3a5c;
+    }
+
     div[data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #0d1b2a, #1a3a5c);
+        background: linear-gradient(180deg, #070e1a, #0d1f35);
+    }
+
+    .stTabs [data-baseweb="tab"] {
+        color: #87ceeb;
+    }
+    .stTabs [aria-selected="true"] {
+        color: #00d4ff;
+        border-bottom-color: #00d4ff;
     }
 </style>
 """, unsafe_allow_html=True)
 
 # ============================================================
-# البيانات الأصلية
+# البيانات الافتراضية
 # ============================================================
 DEFAULT_DATA = [
     8.72, 6.75, 1.86, 2.18, 1.25, 2.28, 1.24, 1.2, 1.54, 24.46, 4.16, 1.49,
@@ -225,205 +247,307 @@ DEFAULT_DATA = [
 ]
 
 # ============================================================
-# دوال التحليل الأساسية
+# دوال التحليل
 # ============================================================
 
 @st.cache_data
-def find_threshold(data):
-    """إيجاد العتبة الطبيعية الفاصلة"""
-    sorted_d = sorted(data)
-    gaps = []
-    for i in range(len(sorted_d) - 1):
-        if 4.0 <= sorted_d[i] <= 15.0:
-            gap = sorted_d[i+1] - sorted_d[i]
-            gaps.append((gap, sorted_d[i], sorted_d[i+1]))
-    if not gaps:
-        return 6.0
-    gaps.sort(reverse=True)
-    return round((gaps[0][1] + gaps[0][2]) / 2, 2)
+def compute_basic_stats(data):
+    arr = np.array(data)
+    return {
+        'n'       : len(arr),
+        'mean'    : float(np.mean(arr)),
+        'median'  : float(np.median(arr)),
+        'std'     : float(np.std(arr)),
+        'min'     : float(np.min(arr)),
+        'max'     : float(np.max(arr)),
+        'q25'     : float(np.percentile(arr, 25)),
+        'q75'     : float(np.percentile(arr, 75)),
+        'skew'    : float(stats.skew(arr)),
+        'kurt'    : float(stats.kurtosis(arr)),
+    }
 
 
 @st.cache_data
-def build_cycles(data, threshold):
-    """بناء الدورات من البيانات"""
-    cycles = []
-    acc    = 0.0
-    vals   = []
+def run_randomness_tests(data):
+    arr = np.array(data)
+    results = {}
 
-    for i, val in enumerate(data):
-        if val >= threshold:
-            cycles.append({
-                'end_idx'   : i,
-                'jump'      : val,
-                'acc_before': round(acc, 4),
-                'n_charges' : len(vals),
-                'charges'   : vals.copy()
-            })
-            acc  = 0.0
-            vals = []
-        else:
-            acc = round(acc + val, 4)
-            vals.append(val)
-
-    remaining = {
-        'current_acc' : round(acc, 4),
-        'current_vals': vals,
-        'n_values'    : len(vals)
+    # ── 1. اختبار الارتباط الذاتي (Lag-1) ──────────────────
+    ac1 = float(np.corrcoef(arr[:-1], arr[1:])[0, 1])
+    results['autocorr'] = {
+        'value'  : round(ac1, 4),
+        'pass'   : abs(ac1) < 0.10,
+        'label'  : 'ارتباط ذاتي Lag-1',
+        'interp' : (
+            f"ارتباط ضعيف جداً ({ac1:.4f}) → لا نمط واضح بين قيمة وما يليها"
+            if abs(ac1) < 0.10 else
+            f"ارتباط ملحوظ ({ac1:.4f}) → يوجد تبعية بين القيم المتتالية"
+        )
     }
-    return cycles, remaining
+
+    # ── 2. Runs Test ─────────────────────────────────────────
+    med  = float(np.median(arr))
+    runs_seq = [1 if x > med else 0 for x in arr]
+    n1 = int(sum(runs_seq))
+    n2 = len(runs_seq) - n1
+    r  = int(sum(
+        1 for i in range(1, len(runs_seq))
+        if runs_seq[i] != runs_seq[i-1]
+    ) + 1)
+    exp_r = 2*n1*n2/(n1+n2) + 1 if (n1+n2) > 0 else 1
+    var_r = (
+        2*n1*n2*(2*n1*n2 - n1 - n2) /
+        ((n1+n2)**2 * (n1+n2-1) + 1e-10)
+    )
+    z_runs = (r - exp_r) / (var_r**0.5 + 1e-10)
+    p_runs = float(2 * (1 - stats.norm.cdf(abs(z_runs))))
+    results['runs'] = {
+        'z'      : round(z_runs, 4),
+        'p'      : round(p_runs, 4),
+        'pass'   : p_runs > 0.05,
+        'label'  : 'Runs Test (تسلسل)',
+        'interp' : (
+            f"p={p_runs:.4f} > 0.05 → التسلسل عشوائي"
+            if p_runs > 0.05 else
+            f"p={p_runs:.4f} < 0.05 → التسلسل غير عشوائي"
+        )
+    }
+
+    # ── 3. Kolmogorov-Smirnov مقابل توزيع أسي ───────────────
+    loc_exp = float(np.min(arr))
+    scale_exp = float(np.mean(arr) - loc_exp)
+    ks_stat, ks_p = stats.kstest(
+        arr, 'expon',
+        args=(loc_exp, scale_exp + 1e-10)
+    )
+    results['ks_exp'] = {
+        'stat'   : round(float(ks_stat), 4),
+        'p'      : round(float(ks_p),    4),
+        'pass'   : ks_p > 0.05,
+        'label'  : 'KS - توزيع أسي',
+        'interp' : (
+            f"p={ks_p:.4f} → البيانات تتبع توزيعاً أسياً"
+            if ks_p > 0.05 else
+            f"p={ks_p:.4f} → البيانات لا تتبع التوزيع الأسي بدقة"
+        )
+    }
+
+    # ── 4. اختبار الطبيعي ────────────────────────────────────
+    _, norm_p = stats.normaltest(arr)
+    results['normality'] = {
+        'p'      : round(float(norm_p), 6),
+        'pass'   : norm_p > 0.05,
+        'label'  : 'اختبار الطبيعية',
+        'interp' : (
+            "البيانات طبيعية التوزيع"
+            if norm_p > 0.05 else
+            "البيانات ليست طبيعية (انحراف يميني واضح)"
+        )
+    }
+
+    # ── 5. ارتباطات متعددة Lag 1-5 ──────────────────────────
+    lags = {}
+    for lag in range(1, 6):
+        if len(arr) > lag:
+            c = float(np.corrcoef(arr[:-lag], arr[lag:])[0, 1])
+            lags[lag] = round(c, 4)
+    results['lags'] = lags
+
+    # ── 6. حكم شامل ─────────────────────────────────────────
+    passed = sum([
+        results['autocorr']['pass'],
+        results['runs']['pass'],
+    ])
+    results['verdict'] = {
+        'random'   : passed >= 2,
+        'score'    : passed,
+        'max_score': 2
+    }
+
+    return results
 
 
 @st.cache_data
-def compute_model(cycles):
-    """حساب معاملات النموذج"""
-    valid = [(c['acc_before'], c['jump'])
-             for c in cycles if c['acc_before'] > 2.0]
-    if len(valid) < 5:
-        return None
-
-    x = np.array([v[0] for v in valid])
-    y = np.array([v[1] for v in valid])
-
-    # Least Squares
-    denom  = np.mean(x**2) - np.mean(x)**2
-    slope  = (np.mean(x*y) - np.mean(x)*np.mean(y)) / (denom + 1e-10)
-    inter  = np.mean(y) - slope * np.mean(x)
-
-    # R²
-    y_pred = slope * x + inter
-    ss_res = np.sum((y - y_pred)**2)
-    ss_tot = np.sum((y - np.mean(y))**2)
-    r2     = float(1 - ss_res / ss_tot) if ss_tot > 0 else 0.0
-
-    # وسيط النسب
-    slope_med = float(np.median(y / x))
-
-    # معامل الدورات الأخيرة (آخر 10)
-    recent = valid[-10:] if len(valid) >= 10 else valid
-    xr = np.array([v[0] for v in recent])
-    yr = np.array([v[1] for v in recent])
-    dr = np.mean(xr**2) - np.mean(xr)**2
-    slope_r = (np.mean(xr*yr) - np.mean(xr)*np.mean(yr)) / (dr + 1e-10)
-    inter_r = np.mean(yr) - slope_r * np.mean(xr)
-
-    return {
-        'slope'       : round(float(slope),     4),
-        'intercept'   : round(float(inter),     4),
-        'slope_med'   : round(slope_med,         4),
-        'slope_recent': round(float(slope_r),    4),
-        'inter_recent': round(float(inter_r),    4),
-        'r2'          : round(r2,                4),
-        'x'           : x,
-        'y'           : y,
-        'n_points'    : len(valid)
-    }
-
-
-def predict(acc, model, ceiling, recent_weight=0.6):
-    """
-    التوقع مع نطاق الثقة
-    يجمع بين المعامل التاريخي والأخير
-    """
-    s_hist = model['slope']
-    i_hist = model['intercept']
-    s_rec  = model['slope_recent']
-    i_rec  = model['inter_recent']
-    r2     = model['r2']
-
-    p_hist = s_hist * acc + i_hist
-    p_rec  = s_rec  * acc + i_rec
-    p_final = (1 - recent_weight) * p_hist + recent_weight * p_rec
-
-    # نطاق الثقة بناءً على R² والانحراف التاريخي
-    y_all  = model['y']
-    resid_std = float(np.std(y_all - (s_hist * model['x'] + i_hist)))
-    margin = resid_std * (1.0 + (1 - r2))
-
-    lo = max(1.0,    p_final - margin)
-    hi = min(ceiling, p_final + margin)
-
-    # مستوى الثقة
-    x_all = model['x']
-    z = abs(acc - float(np.mean(x_all))) / (float(np.std(x_all)) + 1e-10)
-    conf = r2 * 100 - min(15, z * 4) - min(10, abs(s_hist - s_rec) * 15)
-    conf = max(10.0, min(92.0, conf))
-
-    return {
-        'point'  : round(p_final, 2),
-        'lo'     : round(lo,      2),
-        'hi'     : round(hi,      2),
-        'conf'   : round(conf,    1),
-        'p_hist' : round(p_hist,  2),
-        'p_rec'  : round(p_rec,   2),
-        'margin' : round(margin,  2)
-    }
-
-
-def backtest(cycles, model, n=20):
-    """اختبار خلفي على آخر N دورة"""
-    if len(cycles) < n + 5:
-        n = max(5, len(cycles) // 4)
-
-    train  = cycles[:-n]
-    test   = cycles[-n:]
-
-    valid  = [(c['acc_before'], c['jump'])
-              for c in train if c['acc_before'] > 2.0]
-    if len(valid) < 5:
-        return None, n
-
-    x = np.array([v[0] for v in valid])
-    y = np.array([v[1] for v in valid])
-    d = np.mean(x**2) - np.mean(x)**2
-    s = (np.mean(x*y) - np.mean(x)*np.mean(y)) / (d + 1e-10)
-    b = np.mean(y) - s * np.mean(x)
-
-    rows = []
-    for c in test:
-        acc  = c['acc_before']
-        real = c['jump']
-        pred = s * acc + b
-        err  = abs(pred - real)
-        pct  = 100 * err / real if real > 0 else 0
-        rows.append({
-            'العداد قبل القفزة': round(acc,  2),
-            'القفزة الفعلية'   : round(real, 2),
-            'التوقع'           : round(pred, 2),
-            'الخطأ المطلق'     : round(err,  2),
-            'الخطأ %'          : round(pct,  1),
-            'الحكم'            : '✅' if pct < 30 else ('⚠️' if pct < 55 else '❌')
+def compute_distribution(data):
+    """توزيع البيانات على حالات"""
+    arr   = np.array(data)
+    total = len(arr)
+    bins  = [
+        (1.0,  2.0,  'منخفض جداً',  '#4a9eff'),
+        (2.0,  5.0,  'منخفض',       '#00d4ff'),
+        (5.0,  10.0, 'متوسط',       '#ffa500'),
+        (10.0, 20.0, 'مرتفع',       '#ff6b6b'),
+        (20.0, 99.0, 'مرتفع جداً',  '#ff0066'),
+    ]
+    result = []
+    for lo, hi, label, color in bins:
+        cnt = int(np.sum((arr >= lo) & (arr < hi)))
+        result.append({
+            'label': label,
+            'range': f"{lo}-{hi}",
+            'count': cnt,
+            'pct'  : round(100 * cnt / total, 2),
+            'color': color,
         })
+    return result
 
-    df  = pd.DataFrame(rows)
-    acc = (df['الخطأ %'] < 30).sum() / len(df) * 100
-    return df, acc
+
+@st.cache_data
+def kelly_criterion(data, multiplier_threshold=2.0):
+    """
+    حساب Kelly Criterion لإدارة رأس المال
+    p  = احتمال الفوز (قيمة >= multiplier_threshold)
+    b  = متوسط المضاعف عند الفوز
+    q  = 1 - p
+    f* = (bp - q) / b
+    """
+    arr  = np.array(data)
+    wins = arr[arr >= multiplier_threshold]
+    p    = len(wins) / len(arr)
+    q    = 1 - p
+    b    = float(np.mean(wins)) if len(wins) > 0 else multiplier_threshold
+
+    kelly = (b * p - q) / (b + 1e-10)
+    kelly = max(0.0, min(kelly, 0.5))   # حد أقصى 50% دائماً
+
+    # Half Kelly (أكثر أماناً)
+    half_kelly = kelly / 2
+
+    # احتمال الخراب عند استراتيجيات مختلفة
+    def ruin_prob(f, p, b, n=100):
+        """محاكاة بسيطة لاحتمال الخسارة الكاملة"""
+        trials   = 500
+        bankrupt = 0
+        for _ in range(trials):
+            capital = 1.0
+            for _ in range(n):
+                bet = capital * f
+                if np.random.random() < p:
+                    capital += bet * b
+                else:
+                    capital -= bet
+                if capital <= 0.01:
+                    bankrupt += 1
+                    break
+        return round(bankrupt / trials * 100, 1)
+
+    return {
+        'p'          : round(p,           4),
+        'q'          : round(q,           4),
+        'b'          : round(b,           4),
+        'kelly'      : round(kelly,       4),
+        'half_kelly' : round(half_kelly,  4),
+        'kelly_pct'  : round(kelly*100,   2),
+        'half_pct'   : round(half_kelly*100, 2),
+        'threshold'  : multiplier_threshold,
+        'n_wins'     : len(wins),
+        'n_total'    : len(arr),
+    }
+
+
+@st.cache_data
+def simulate_strategies(data, capital=1000.0, n_sim=200):
+    """
+    محاكاة 3 استراتيجيات رهان على البيانات التاريخية
+    1. ثابت (1% من رأس المال)
+    2. Kelly نصف
+    3. متهور (10%)
+    """
+    arr = np.array(data)
+    threshold = 2.0
+
+    def run_sim(fraction):
+        caps = [capital]
+        cap  = capital
+        for val in arr:
+            bet = max(0.01, cap * fraction)
+            if val >= threshold:
+                cap += bet * (val - 1)
+            else:
+                cap -= bet
+            cap = max(0, cap)
+            caps.append(round(cap, 2))
+        return caps
+
+    kelly_info = kelly_criterion(data, threshold)
+    f_kelly    = kelly_info['half_kelly']
+
+    return {
+        'conservative': run_sim(0.01),
+        'kelly'       : run_sim(f_kelly),
+        'aggressive'  : run_sim(0.10),
+        'f_kelly'     : f_kelly,
+    }
+
+
+def stop_loss_analysis(data, capital=1000.0,
+                        stop_loss_pct=20.0, take_profit_pct=50.0):
+    """تحليل حدود الخسارة والربح"""
+    arr = np.array(data)
+    sl  = capital * (1 - stop_loss_pct  / 100)
+    tp  = capital * (1 + take_profit_pct / 100)
+
+    # محاكاة بسيطة بفرصة ثابتة 1%
+    cap  = capital
+    hits_sl = 0
+    hits_tp = 0
+    neutral = 0
+
+    for val in arr:
+        bet = cap * 0.02
+        if val >= 2.0:
+            cap += bet * (val - 1)
+        else:
+            cap -= bet
+        cap = max(0, cap)
+
+        if cap <= sl:
+            hits_sl += 1
+            cap = capital   # إعادة تعيين
+        elif cap >= tp:
+            hits_tp += 1
+            cap = capital
+
+    total_triggers = hits_sl + hits_tp + neutral
+    return {
+        'sl_level'   : round(sl,       2),
+        'tp_level'   : round(tp,       2),
+        'hits_sl'    : hits_sl,
+        'hits_tp'    : hits_tp,
+        'sl_pct'     : stop_loss_pct,
+        'tp_pct'     : take_profit_pct,
+    }
 
 
 # ============================================================
 # الشريط الجانبي
 # ============================================================
 with st.sidebar:
-    st.markdown("## ⚙️ إعدادات النظام")
+    st.markdown(
+        "<h2 style='color:#00d4ff;'>⚙️ الإعدادات</h2>",
+        unsafe_allow_html=True
+    )
     st.markdown("---")
 
-    data_source = st.radio(
+    # مصدر البيانات
+    src = st.radio(
         "مصدر البيانات",
         ["البيانات الافتراضية", "إدخال يدوي"],
         index=0
     )
 
-    if data_source == "إدخال يدوي":
-        raw_input = st.text_area(
-            "أدخل القيم (مفصولة بفاصلة أو سطر جديد)",
-            height=200,
-            placeholder="1.5, 2.3, 8.7, 1.1, ..."
+    if src == "إدخال يدوي":
+        raw_txt = st.text_area(
+            "أدخل القيم (مفصولة بفاصلة أو سطر)",
+            height=180,
+            placeholder="1.5, 2.3, 8.7 ..."
         )
+        import re
+        nums = re.findall(r"[\d.]+", raw_txt)
         try:
-            import re
-            nums = re.findall(r"[\d.]+", raw_input)
-            user_data = [float(n) for n in nums if float(n) > 0]
-            if len(user_data) < 20:
-                st.warning("يحتاج النموذج 20 قيمة على الأقل")
+            user_data = [float(x) for x in nums if float(x) > 0]
+            if len(user_data) < 30:
+                st.warning("يُنصح بـ 30 قيمة على الأقل")
                 user_data = DEFAULT_DATA
         except Exception:
             user_data = DEFAULT_DATA
@@ -431,763 +555,990 @@ with st.sidebar:
         user_data = DEFAULT_DATA
 
     st.markdown("---")
-    st.markdown("### 🎛️ ضبط النموذج")
-
-    auto_thresh = st.checkbox("عتبة تلقائية", value=True)
-    if not auto_thresh:
-        manual_thresh = st.slider(
-            "العتبة الفاصلة", 3.0, 15.0, 6.0, 0.5
-        )
-
-    recent_w = st.slider(
-        "وزن الدورات الأخيرة", 0.0, 1.0, 0.6, 0.05,
-        help="0 = تاريخي كامل | 1 = أخير 10 فقط"
+    st.markdown(
+        "<h3 style='color:#87ceeb;'>💰 إعدادات رأس المال</h3>",
+        unsafe_allow_html=True
     )
 
-    n_backtest = st.slider("دورات الاختبار الخلفي", 10, 40, 20, 5)
+    capital      = st.number_input(
+        "رأس المال الابتدائي", 100, 1_000_000, 1000, 100
+    )
+    mult_thresh  = st.slider(
+        "عتبة الفوز (المضاعف)", 1.1, 5.0, 2.0, 0.1,
+        help="القيمة الدنيا التي تُعتبر 'فوزاً'"
+    )
+    sl_pct       = st.slider(
+        "حد الخسارة Stop Loss %", 5, 50, 20, 5
+    )
+    tp_pct       = st.slider(
+        "هدف الربح Take Profit %", 10, 200, 50, 10
+    )
 
     st.markdown("---")
-    st.markdown("### 📌 معلومات")
-    st.info(
-        "النموذج يعتمد على:\n"
-        "- العداد التراكمي\n"
-        "- انحدار خطي تكيفي\n"
-        "- نافذة متحركة (آخر 10)\n"
-        "- اختبار خلفي تلقائي"
+    st.markdown(
+        "<h3 style='color:#87ceeb;'>📊 إعدادات العرض</h3>",
+        unsafe_allow_html=True
     )
+    n_show = st.slider("آخر N قيمة للعرض", 50, 500, 150, 50)
+
+    st.markdown("---")
+    st.markdown("""
+    <div style='color:#4a7a9b; font-size:0.8em; line-height:1.6;'>
+        ⚠️ <strong style='color:#ffa500;'>تحذير قانوني:</strong><br>
+        هذه الأداة للتحليل الإحصائي فقط.<br>
+        لا تضمن أرباحاً ولا تتنبأ بدقة مطلقة.<br>
+        المقامرة تنطوي على مخاطر مالية حقيقية.
+    </div>
+    """, unsafe_allow_html=True)
 
 # ============================================================
-# تشغيل التحليل
+# تشغيل الحسابات
 # ============================================================
-data      = user_data
-threshold = (find_threshold(data) if auto_thresh else manual_thresh)
-cycles, remaining = build_cycles(data, threshold)
-model     = compute_model(cycles)
+data         = user_data
+basic        = compute_basic_stats(data)
+rand_tests   = run_randomness_tests(data)
+dist_info    = compute_distribution(data)
+kelly_info   = kelly_criterion(data, mult_thresh)
+sim_data     = simulate_strategies(data, capital)
+sl_info      = stop_loss_analysis(data, capital, sl_pct, tp_pct)
 
 # ============================================================
-# العنوان الرئيسي
+# الرأس
 # ============================================================
-st.markdown(
-    "<h1 style='text-align:center; color:#00d4ff;'>"
-    "🎯 نظام التنبؤ الذكي بالأنماط</h1>",
-    unsafe_allow_html=True
-)
-st.markdown(
-    "<p style='text-align:center; color:#87ceeb; font-size:1.1em;'>"
-    "تحليل متقدم للأنماط الخفية مع نظام توصيات ذكي</p>",
-    unsafe_allow_html=True
-)
+st.markdown("""
+<h1 style='text-align:center; color:#00d4ff; margin-bottom:4px;'>
+    📊 المحلل الإحصائي الصادق
+</h1>
+<p style='text-align:center; color:#87ceeb; font-size:1.05em;'>
+    تحليل عشوائية البيانات · إدارة رأس المال · حدود الخسارة والربح
+</p>
+""", unsafe_allow_html=True)
 st.markdown("---")
 
-if model is None:
-    st.error("البيانات غير كافية لبناء النموذج. أضف المزيد من القيم.")
-    st.stop()
-
 # ============================================================
-# بطاقات الإحصاءات العليا
+# بطاقات الإحصاءات
 # ============================================================
-all_jumps = [c['jump'] for c in cycles]
-acc_now   = remaining['current_acc']
-ceiling   = max(all_jumps)
-
-col1, col2, col3, col4, col5 = st.columns(5)
-
-with col1:
-    st.markdown(f"""
-    <div class="metric-card">
-        <div class="metric-value">{len(data)}</div>
-        <div class="metric-label">إجمالي القيم</div>
-    </div>""", unsafe_allow_html=True)
-
-with col2:
-    st.markdown(f"""
-    <div class="metric-card">
-        <div class="metric-value">{len(cycles)}</div>
-        <div class="metric-label">دورات مكتملة</div>
-    </div>""", unsafe_allow_html=True)
-
-with col3:
-    st.markdown(f"""
-    <div class="metric-card">
-        <div class="metric-value">{threshold}</div>
-        <div class="metric-label">العتبة الفاصلة</div>
-    </div>""", unsafe_allow_html=True)
-
-with col4:
-    st.markdown(f"""
-    <div class="metric-card">
-        <div class="metric-value">{acc_now:.2f}</div>
-        <div class="metric-label">العداد الحالي</div>
-    </div>""", unsafe_allow_html=True)
-
-with col5:
-    r2_pct = model['r2'] * 100
-    st.markdown(f"""
-    <div class="metric-card">
-        <div class="metric-value">{r2_pct:.1f}%</div>
-        <div class="metric-label">جودة النموذج R²</div>
-    </div>""", unsafe_allow_html=True)
+c1, c2, c3, c4, c5, c6 = st.columns(6)
+cards = [
+    (c1, len(data),             "عدد القيم",          ""),
+    (c2, f"{basic['mean']:.2f}","المتوسط",            ""),
+    (c3, f"{basic['median']:.2f}","الوسيط",           ""),
+    (c4, f"{basic['std']:.2f}", "الانحراف المعياري",  ""),
+    (c5, f"{basic['max']:.2f}", "أعلى قيمة",          ""),
+    (c6, f"{basic['skew']:.2f}","معامل الانحراف",     ""),
+]
+for col, val, lbl, sub in cards:
+    with col:
+        st.markdown(f"""
+        <div class="card">
+            <div class="card-title">{lbl}</div>
+            <div class="card-value">{val}</div>
+            <div class="card-sub">{sub}</div>
+        </div>""", unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
 
 # ============================================================
-# التوقع الرئيسي
+# التبويبات الرئيسية
 # ============================================================
-pred_result = predict(acc_now, model, ceiling, recent_w)
-p      = pred_result['point']
-lo     = pred_result['lo']
-hi     = pred_result['hi']
-conf   = pred_result['conf']
-margin = pred_result['margin']
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    "🔬 اختبار العشوائية",
+    "📈 تحليل البيانات",
+    "💰 Kelly & رأس المال",
+    "🛡️ Stop Loss / Take Profit",
+    "📋 التوصيات الشاملة",
+])
 
-# هل يتجاوز السقف؟
-split_mode = p > ceiling
-if split_mode:
-    s  = model['slope_recent']
-    b  = model['inter_recent']
-    r_acc  = max(0.0, acc_now - (ceiling - b) / (s + 1e-10))
-    p2_res = predict(r_acc, model, ceiling, recent_w)
-    p2     = p2_res['point']
-
-st.markdown("## 🔮 التوقع القادم")
-
-pred_col, conf_col = st.columns([2, 1])
-
-with pred_col:
-    if split_mode:
-        st.markdown(f"""
-        <div class="prediction-box">
-            <div style="color:#ffa500; font-size:1em; margin-bottom:8px;">
-                ⚡ وضع التقسيم - العداد يتجاوز السقف
-            </div>
-            <div style="display:flex; justify-content:space-around;">
-                <div>
-                    <div style="color:#aaa; font-size:0.9em;">القفزة الأولى</div>
-                    <div class="pred-value">{ceiling:.1f}</div>
-                    <div style="color:#87ceeb;">عند السقف</div>
-                </div>
-                <div style="color:#555; font-size:2em; padding-top:10px;">→</div>
-                <div>
-                    <div style="color:#aaa; font-size:0.9em;">القفزة الثانية</div>
-                    <div class="pred-value">{p2:.1f}</div>
-                    <div style="color:#87ceeb;">العداد المتبقي: {r_acc:.2f}</div>
-                </div>
-            </div>
-        </div>""", unsafe_allow_html=True)
-    else:
-        st.markdown(f"""
-        <div class="prediction-box">
-            <div style="color:#aaa; font-size:0.9em; margin-bottom:5px;">
-                القفزة المتوقعة التالية
-            </div>
-            <div class="pred-value">{p:.2f}</div>
-            <div class="pred-range">
-                نطاق الثقة: [{lo:.2f} &nbsp;—&nbsp; {hi:.2f}]
-            </div>
-            <div style="color:#87ceeb; margin-top:8px; font-size:0.9em;">
-                بالمعامل التاريخي: {pred_result['p_hist']:.2f} &nbsp;|&nbsp;
-                بالمعامل الأخير: {pred_result['p_rec']:.2f}
-            </div>
-        </div>""", unsafe_allow_html=True)
-
-with conf_col:
-    conf_color = (
-        "#00ff88" if conf >= 65 else
-        "#ffa500" if conf >= 45 else
-        "#ff4444"
-    )
-    conf_label = (
-        "ثقة عالية"    if conf >= 65 else
-        "ثقة متوسطة"  if conf >= 45 else
-        "ثقة منخفضة"
-    )
-    # شريط الثقة بـ Plotly
-    fig_conf = go.Figure(go.Indicator(
-        mode  = "gauge+number",
-        value = conf,
-        title = {'text': "مستوى الثقة %",
-                 'font': {'color': 'white', 'size': 14}},
-        number= {'suffix': "%", 'font': {'color': conf_color, 'size': 28}},
-        gauge = {
-            'axis' : {'range': [0, 100],
-                      'tickcolor': 'gray'},
-            'bar'  : {'color': conf_color},
-            'steps': [
-                {'range': [0,  45], 'color': 'rgba(255,68,68,0.15)'},
-                {'range': [45, 65], 'color': 'rgba(255,165,0,0.15)'},
-                {'range': [65,100], 'color': 'rgba(0,255,136,0.15)'},
-            ],
-            'threshold': {
-                'line' : {'color': 'white', 'width': 2},
-                'value': conf
-            },
-            'bgcolor': 'rgba(0,0,0,0)'
-        }
-    ))
-    fig_conf.update_layout(
-        height=220,
-        margin=dict(t=40, b=10, l=20, r=20),
-        paper_bgcolor='rgba(0,0,0,0)',
-        font_color='white'
-    )
-    st.plotly_chart(fig_conf, use_container_width=True)
+# ══════════════════════════════════════════════════════════════
+# التبويب 1: اختبار العشوائية
+# ══════════════════════════════════════════════════════════════
+with tab1:
     st.markdown(
-        f"<div style='text-align:center; color:{conf_color}; "
-        f"font-weight:bold;'>{conf_label}</div>",
+        "<div class='section-title'>🔬 نتائج اختبارات العشوائية</div>",
         unsafe_allow_html=True
     )
 
-# ============================================================
-# نظام التوصيات
-# ============================================================
-st.markdown("---")
-st.markdown("## 📋 نظام التوصيات")
-
-rec_col1, rec_col2 = st.columns(2)
-
-with rec_col1:
-    st.markdown("### 🚦 التوصية الرئيسية")
-
-    # تحديد قوة الإشارة
-    pct_of_ceiling = p / ceiling * 100 if not split_mode else 100
-
-    if split_mode:
-        rec_class = "rec-strong"
-        rec_icon  = "⚡"
-        rec_title = "إشارة قوية جداً - وضع تقسيم"
-        rec_body  = (
-            f"العداد ({acc_now:.2f}) يتجاوز حد التقسيم. "
-            f"توقع قفزة أولى عند السقف ({ceiling:.1f}) "
-            f"تليها قفزة ثانية (~{p2:.1f})."
-        )
-    elif pct_of_ceiling >= 75:
-        rec_class = "rec-strong"
-        rec_icon  = "🟢"
-        rec_title = "إشارة قوية - قفزة كبيرة محتملة"
-        rec_body  = (
-            f"العداد ({acc_now:.2f}) في مرحلة متقدمة. "
-            f"التوقع: قفزة بين {lo:.1f} و {hi:.1f}."
-        )
-    elif pct_of_ceiling >= 45:
-        rec_class = "rec-moderate"
-        rec_icon  = "🟡"
-        rec_title = "إشارة متوسطة - قفزة معتدلة"
-        rec_body  = (
-            f"العداد ({acc_now:.2f}) في منطقة وسطية. "
-            f"التوقع: {lo:.1f} - {hi:.1f}. "
-            f"انتظر تأكيداً إضافياً."
-        )
-    else:
-        rec_class = "rec-weak"
-        rec_icon  = "🔴"
-        rec_title = "إشارة ضعيفة - لا تزال في مرحلة الشحن"
-        rec_body  = (
-            f"العداد ({acc_now:.2f}) منخفض نسبياً. "
-            f"النظام لا يزال يتراكم. "
-            f"توقع قفزة صغيرة ({lo:.1f} - {hi:.1f}) أو استمرار الشحن."
-        )
+    # الحكم الشامل
+    verdict   = rand_tests['verdict']
+    is_random = verdict['random']
+    v_color   = "#ffa500" if is_random else "#00ff88"
+    v_icon    = "⚠️" if is_random else "🔍"
+    v_text    = (
+        "البيانات تبدو عشوائية - لا نمط حتمي قابل للاستغلال"
+        if is_random else
+        "تم اكتشاف انحراف عن العشوائية - يستحق دراسة أعمق"
+    )
 
     st.markdown(f"""
-    <div class="rec-box {rec_class}">
-        <strong>{rec_icon} {rec_title}</strong><br>
-        <span style="font-size:0.95em;">{rec_body}</span>
+    <div style="background:rgba({
+        '255,165,0' if is_random else '0,255,136'
+    },0.08); border:2px solid {v_color};
+    border-radius:14px; padding:20px; text-align:center; margin-bottom:20px;">
+        <div style="font-size:2em;">{v_icon}</div>
+        <div style="color:{v_color}; font-size:1.3em;
+                    font-weight:bold; margin:8px 0;">
+            {v_text}
+        </div>
+        <div style="color:#87ceeb; font-size:0.9em;">
+            اجتاز {verdict['score']} من {verdict['max_score']} اختبارات العشوائية
+        </div>
     </div>""", unsafe_allow_html=True)
 
-    # تفاصيل إضافية
-    st.markdown("### 📐 تفاصيل النموذج")
-    details = {
-        "المعامل (الوزن) التاريخي": f"{model['slope']:.4f}",
-        "المعامل الأخير (10 دورات)": f"{model['slope_recent']:.4f}",
-        "القاطع": f"{model['intercept']:.4f}",
-        "جودة النموذج R²": f"{model['r2']:.4f}",
-        "السقف المرصود": f"{ceiling:.2f}",
-        "نقاط التدريب": f"{model['n_points']}",
-        "هامش الخطأ المتوقع": f"±{margin:.2f}",
-    }
-    for k, v in details.items():
-        st.markdown(
-            f"<div style='display:flex; justify-content:space-between; "
-            f"padding:4px 0; border-bottom:1px solid #1a3a5c;'>"
-            f"<span style='color:#87ceeb;'>{k}</span>"
-            f"<span style='color:#00d4ff; font-weight:bold;'>{v}</span>"
-            f"</div>",
-            unsafe_allow_html=True
+    # نتائج الاختبارات التفصيلية
+    tests_to_show = ['autocorr', 'runs', 'ks_exp', 'normality']
+    test_cols     = st.columns(2)
+
+    for i, key in enumerate(tests_to_show):
+        t   = rand_tests[key]
+        col = test_cols[i % 2]
+        with col:
+            passed     = t.get('pass', False)
+            box_class  = "result-pass" if passed else "result-fail"
+            icon       = "✅" if passed else "❌"
+
+            # القيمة الرئيسية للعرض
+            if 'value' in t:
+                main_val = f"{t['value']}"
+            elif 'z' in t:
+                main_val = f"z = {t['z']}, p = {t['p']}"
+            elif 'stat' in t:
+                main_val = f"stat = {t['stat']}, p = {t['p']}"
+            else:
+                main_val = f"p = {t['p']}"
+
+            st.markdown(f"""
+            <div class="{box_class}">
+                <strong>{icon} {t['label']}</strong><br>
+                <span style="font-size:0.9em; opacity:0.9;">
+                    {main_val}
+                </span><br>
+                <span style="font-size:0.85em; opacity:0.8;
+                             margin-top:4px; display:block;">
+                    {t['interp']}
+                </span>
+            </div>""", unsafe_allow_html=True)
+
+    # رسم الارتباطات الذاتية
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown(
+        "<div class='section-title'>📉 الارتباط الذاتي (Lag 1-5)</div>",
+        unsafe_allow_html=True
+    )
+
+    lags   = rand_tests['lags']
+    lag_x  = list(lags.keys())
+    lag_y  = list(lags.values())
+    colors = ['#00ff88' if abs(v) < 0.10 else '#ff4444' for v in lag_y]
+
+    fig_lag = go.Figure()
+    fig_lag.add_trace(go.Bar(
+        x=[f"Lag {k}" for k in lag_x],
+        y=lag_y,
+        marker_color=colors,
+        text=[f"{v:.4f}" for v in lag_y],
+        textposition='outside'
+    ))
+    fig_lag.add_hline(y=0.10, line_dash='dash',
+                      line_color='#ffa500', opacity=0.7,
+                      annotation_text="حد الأهمية +0.10")
+    fig_lag.add_hline(y=-0.10, line_dash='dash',
+                      line_color='#ffa500', opacity=0.7,
+                      annotation_text="حد الأهمية -0.10")
+    fig_lag.update_layout(
+        title="معاملات الارتباط الذاتي - كلما اقتربت من 0 كلما كانت العشوائية أعلى",
+        yaxis_title="معامل الارتباط",
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(15,25,45,0.8)',
+        font_color='white',
+        height=320,
+    )
+    st.plotly_chart(fig_lag, use_container_width=True)
+
+    # توزيع القيم - هيستوغرام
+    st.markdown(
+        "<div class='section-title'>📊 توزيع القيم</div>",
+        unsafe_allow_html=True
+    )
+    arr_np  = np.array(data)
+    fig_hist = go.Figure()
+    fig_hist.add_trace(go.Histogram(
+        x=arr_np,
+        nbinsx=40,
+        marker_color='#4a9eff',
+        opacity=0.8,
+        name='التوزيع الفعلي'
+    ))
+    # منحنى أسي للمقارنة
+    x_range = np.linspace(float(arr_np.min()),
+                          float(arr_np.max()), 200)
+    loc_e   = float(arr_np.min())
+    scl_e   = float(arr_np.mean()) - loc_e
+    pdf_e   = stats.expon.pdf(x_range, loc=loc_e, scale=scl_e+1e-10)
+    pdf_e   = pdf_e * len(data) * (arr_np.max()-arr_np.min()) / 40
+
+    fig_hist.add_trace(go.Scatter(
+        x=x_range, y=pdf_e,
+        mode='lines', name='توزيع أسي مرجعي',
+        line=dict(color='#ff6b6b', width=2, dash='dash')
+    ))
+    fig_hist.update_layout(
+        title="توزيع القيم مقارنةً بالتوزيع الأسي المرجعي",
+        xaxis_title="القيمة",
+        yaxis_title="التكرار",
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(15,25,45,0.8)',
+        font_color='white',
+        legend=dict(bgcolor='rgba(0,0,0,0.3)'),
+        height=350,
+    )
+    st.plotly_chart(fig_hist, use_container_width=True)
+
+# ══════════════════════════════════════════════════════════════
+# التبويب 2: تحليل البيانات
+# ══════════════════════════════════════════════════════════════
+with tab2:
+    st.markdown(
+        "<div class='section-title'>📈 السلسلة الزمنية</div>",
+        unsafe_allow_html=True
+    )
+
+    data_slice = data[-n_show:]
+    idx_slice  = list(range(len(data) - n_show, len(data)))
+
+    fig_ts = go.Figure()
+    fig_ts.add_trace(go.Scatter(
+        x=idx_slice, y=data_slice,
+        mode='lines',
+        line=dict(color='#4a9eff', width=1),
+        name='القيم', opacity=0.8
+    ))
+
+    # تلوين المناطق
+    for lo, hi, lbl, clr in [
+        (1, 2,  'منخفض جداً', 'rgba(74,158,255,0.08)'),
+        (2, 5,  'منخفض',      'rgba(0,212,255,0.05)'),
+        (5, 10, 'متوسط',      'rgba(255,165,0,0.05)'),
+    ]:
+        fig_ts.add_hrect(
+            y0=lo, y1=hi,
+            fillcolor=clr,
+            line_width=0,
+            annotation_text=lbl,
+            annotation_position="left"
         )
 
-with rec_col2:
-    st.markdown("### 🎰 السيناريوهات المحتملة")
+    # تمييز القيم العالية
+    hi_idx = [idx_slice[i] for i, v in enumerate(data_slice) if v >= 10]
+    hi_val = [v for v in data_slice if v >= 10]
+    fig_ts.add_trace(go.Scatter(
+        x=hi_idx, y=hi_val,
+        mode='markers',
+        marker=dict(color='#ff6b6b', size=7),
+        name='قيم عالية (≥10)'
+    ))
 
-    # بناء سيناريوهات بناءً على البيانات الفعلية
-    s     = model['slope_recent']
-    b_int = model['inter_recent']
-    r2    = model['r2']
-    std_j = float(np.std(all_jumps))
+    fig_ts.add_hline(
+        y=basic['mean'], line_dash='dot',
+        line_color='#ffa500', opacity=0.7,
+        annotation_text=f"المتوسط {basic['mean']:.2f}"
+    )
+    fig_ts.update_layout(
+        title=f"آخر {n_show} قيمة",
+        xaxis_title="الموضع",
+        yaxis_title="القيمة",
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(15,25,45,0.8)',
+        font_color='white',
+        legend=dict(bgcolor='rgba(0,0,0,0.3)'),
+        height=400,
+    )
+    st.plotly_chart(fig_ts, use_container_width=True)
 
-    scenarios = []
+    # توزيع الحالات
+    st.markdown(
+        "<div class='section-title'>🎨 توزيع الحالات</div>",
+        unsafe_allow_html=True
+    )
+    d_col1, d_col2 = st.columns([1, 1])
 
-    # سيناريو متفائل (عداد أعلى بانحراف واحد)
-    acc_opt  = acc_now + float(np.std(model['x'])) * 0.3
-    p_opt    = min(ceiling, s * acc_opt + b_int)
-    scenarios.append(("متفائل  🟢", p_opt,
-                      p_opt - margin * 0.5,
-                      min(ceiling, p_opt + margin * 0.5),
-                      35))
+    with d_col1:
+        labels = [d['label'] for d in dist_info]
+        values = [d['count'] for d in dist_info]
+        colors = [d['color'] for d in dist_info]
 
-    # سيناريو أساسي
-    scenarios.append(("أساسي   🟡", p,
-                      lo, hi, 50))
-
-    # سيناريو متشائم (عداد أقل)
-    acc_pes = max(0, acc_now - float(np.std(model['x'])) * 0.3)
-    p_pes   = max(1.0, s * acc_pes + b_int)
-    scenarios.append(("متشائم  🔴", p_pes,
-                      max(1, p_pes - margin * 0.5),
-                      p_pes + margin * 0.5,
-                      15))
-
-    for name, point, slo, shi, prob in scenarios:
-        shi = min(ceiling, shi)
-        slo = max(1.0,     slo)
-        color = (
-            "#00ff88" if "متفائل" in name else
-            "#ffa500" if "أساسي"  in name else
-            "#ff4444"
+        fig_pie = go.Figure(go.Pie(
+            labels=labels,
+            values=values,
+            marker=dict(colors=colors),
+            hole=0.45,
+            textinfo='label+percent',
+            textfont=dict(size=12, color='white'),
+        ))
+        fig_pie.update_layout(
+            title="توزيع القيم على الحالات",
+            paper_bgcolor='rgba(0,0,0,0)',
+            font_color='white',
+            legend=dict(bgcolor='rgba(0,0,0,0.3)'),
+            height=360,
         )
+        st.plotly_chart(fig_pie, use_container_width=True)
+
+    with d_col2:
+        st.markdown("<br>", unsafe_allow_html=True)
+        for d in dist_info:
+            bar_w = int(d['pct'] * 2)
+            st.markdown(f"""
+            <div style="margin:10px 0;">
+                <div style="display:flex; justify-content:space-between;
+                            margin-bottom:4px;">
+                    <span style="color:{d['color']};">
+                        {d['label']} ({d['range']}x)
+                    </span>
+                    <span style="color:#00d4ff; font-weight:bold;">
+                        {d['count']} ({d['pct']}%)
+                    </span>
+                </div>
+                <div style="background:#1a3a5c; border-radius:4px; height:10px;">
+                    <div style="background:{d['color']}; width:{min(bar_w,200)}px;
+                                height:10px; border-radius:4px;
+                                max-width:100%;"></div>
+                </div>
+            </div>""", unsafe_allow_html=True)
+
+    # المتوسط المتحرك
+    st.markdown(
+        "<div class='section-title'>📉 المتوسط المتحرك</div>",
+        unsafe_allow_html=True
+    )
+    win = st.slider("نافذة المتوسط المتحرك", 5, 50, 20, 5)
+    arr_np = np.array(data)
+    ma     = np.convolve(arr_np, np.ones(win)/win, mode='valid')
+    ma_idx = list(range(win - 1, len(data)))
+
+    fig_ma = go.Figure()
+    fig_ma.add_trace(go.Scatter(
+        x=list(range(len(data))), y=list(data),
+        mode='lines', opacity=0.3,
+        line=dict(color='#4a9eff', width=1),
+        name='القيم الأصلية'
+    ))
+    fig_ma.add_trace(go.Scatter(
+        x=ma_idx, y=list(ma),
+        mode='lines',
+        line=dict(color='#00ff88', width=2),
+        name=f'MA({win})'
+    ))
+    fig_ma.add_hline(
+        y=float(np.mean(arr_np)), line_dash='dash',
+        line_color='#ffa500', opacity=0.6,
+        annotation_text="المتوسط الكلي"
+    )
+    fig_ma.update_layout(
+        title=f"المتوسط المتحرك (نافذة={win})",
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(15,25,45,0.8)',
+        font_color='white',
+        legend=dict(bgcolor='rgba(0,0,0,0.3)'),
+        height=320,
+    )
+    st.plotly_chart(fig_ma, use_container_width=True)
+
+    # جدول الإحصاءات
+    with st.expander("📋 جدول الإحصاءات التفصيلية"):
+        stats_df = pd.DataFrame([
+            {"المقياس": "العدد",               "القيمة": len(data)},
+            {"المقياس": "المتوسط",             "القيمة": round(basic['mean'],   4)},
+            {"المقياس": "الوسيط",              "القيمة": round(basic['median'], 4)},
+            {"المقياس": "الانحراف المعياري",   "القيمة": round(basic['std'],    4)},
+            {"المقياس": "الحد الأدنى",         "القيمة": round(basic['min'],    4)},
+            {"المقياس": "الربيع الأول (Q1)",   "القيمة": round(basic['q25'],   4)},
+            {"المقياس": "الربيع الثالث (Q3)",  "القيمة": round(basic['q75'],   4)},
+            {"المقياس": "الحد الأقصى",         "القيمة": round(basic['max'],    4)},
+            {"المقياس": "معامل الانحراف",      "القيمة": round(basic['skew'],   4)},
+            {"المقياس": "التفرطح (Kurtosis)",  "القيمة": round(basic['kurt'],   4)},
+        ])
+        st.dataframe(stats_df, use_container_width=True, hide_index=True)
+
+# ══════════════════════════════════════════════════════════════
+# التبويب 3: Kelly & رأس المال
+# ══════════════════════════════════════════════════════════════
+with tab3:
+    st.markdown(
+        "<div class='section-title'>📐 حساب Kelly Criterion</div>",
+        unsafe_allow_html=True
+    )
+
+    k1, k2, k3 = st.columns(3)
+
+    with k1:
         st.markdown(f"""
-        <div style="background:rgba(255,255,255,0.05);
-                    border-radius:10px; padding:12px;
-                    margin:8px 0; border-left:3px solid {color};">
-            <div style="display:flex; justify-content:space-between;
-                        align-items:center;">
-                <span style="color:{color}; font-weight:bold;">{name}</span>
-                <span style="color:{color}; font-size:1.4em;
-                             font-weight:bold;">{point:.1f}</span>
+        <div class="kelly-box">
+            <div style="color:#87ceeb; font-size:0.85em;">Kelly الكامل</div>
+            <div class="kelly-value">{kelly_info['kelly_pct']:.1f}%</div>
+            <div style="color:#4a7a9b; font-size:0.8em; margin-top:6px;">
+                من رأس المال لكل رهان
             </div>
-            <div style="color:#87ceeb; font-size:0.85em; margin-top:4px;">
-                النطاق: [{slo:.1f} — {shi:.1f}]
-                &nbsp;|&nbsp; الاحتمال: ~{prob}%
+        </div>""", unsafe_allow_html=True)
+
+    with k2:
+        st.markdown(f"""
+        <div class="kelly-box" style="border-color:#00d4ff;">
+            <div style="color:#87ceeb; font-size:0.85em;">
+                نصف Kelly (الموصى به)
+            </div>
+            <div class="kelly-value" style="color:#00d4ff;">
+                {kelly_info['half_pct']:.1f}%
+            </div>
+            <div style="color:#4a7a9b; font-size:0.8em; margin-top:6px;">
+                أكثر أماناً وعملية
+            </div>
+        </div>""", unsafe_allow_html=True)
+
+    with k3:
+        st.markdown(f"""
+        <div class="kelly-box" style="border-color:#ffa500;">
+            <div style="color:#87ceeb; font-size:0.85em;">
+                احتمال الفوز (≥{mult_thresh}x)
+            </div>
+            <div class="kelly-value" style="color:#ffa500;">
+                {kelly_info['p']*100:.1f}%
+            </div>
+            <div style="color:#4a7a9b; font-size:0.8em; margin-top:6px;">
+                {kelly_info['n_wins']} من {kelly_info['n_total']} قيمة
             </div>
         </div>""", unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown("""
-    <div class="warning-box">
-        ⚠️ <strong>تحذير:</strong> هذا نموذج إحصائي.
-        الثقة مبنية على R² الفعلي من البيانات.
-        لا توجد ضمانات مطلقة في أي نظام تنبؤ.
-    </div>""", unsafe_allow_html=True)
 
-# ============================================================
-# الرسوم البيانية
-# ============================================================
-st.markdown("---")
-st.markdown("## 📊 التحليل البياني")
-
-tab1, tab2, tab3, tab4 = st.tabs([
-    "📈 السلسلة الزمنية",
-    "🔗 العداد مقابل القفزة",
-    "📊 توزيع القفزات",
-    "🧪 الاختبار الخلفي"
-])
-
-# --- التبويب 1: السلسلة الزمنية ---
-with tab1:
-    max_len = len(data)
-    min_val = min(50, max_len) if max_len > 0 else 1
-    default_val = min(200, max_len) if max_len > 0 else 1
-    
-    n_show = st.slider(
-        "عدد القيم المعروضة", 
-        min_value=min_val, 
-        max_value=max(min_val, max_len), 
-        value=default_val
-    )
-    
-    # تصحيح مشكلة IndexError عن طريق التأكد من أن المؤشرات دائمًا داخل النطاق
-    n_show = min(n_show, max_len)
-    start_idx = max(0, max_len - n_show)
-    
-    data_show = data[start_idx:]
-    idx_show  = list(range(start_idx, max_len))
-
-    fig1 = go.Figure()
-
-    # القيم الكاملة
-    fig1.add_trace(go.Scatter(
-        x=idx_show, y=data_show,
-        mode='lines',
-        name='القيم',
-        line=dict(color='#4a9eff', width=1),
-        opacity=0.7
-    ))
-
-    # تمييز القفزات
-    jump_x = [i for i in idx_show if data[i] >= threshold]
-    jump_y = [data[i] for i in jump_x]
-    
-    fig1.add_trace(go.Scatter(
-        x=jump_x, y=jump_y,
-        mode='markers',
-        name='قفزات',
-        marker=dict(color='#ff6b6b', size=8, symbol='circle')
-    ))
-
-    # خط العتبة
-    fig1.add_hline(
-        y=threshold, line_dash='dash',
-        line_color='yellow', opacity=0.5,
-        annotation_text=f"العتبة: {threshold}"
-    )
-
-    # خط السقف
-    fig1.add_hline(
-        y=ceiling, line_dash='dot',
-        line_color='#ff4444', opacity=0.7,
-        annotation_text=f"السقف: {ceiling:.2f}"
-    )
-
-    fig1.update_layout(
-        title='السلسلة الزمنية مع تمييز القفزات',
-        xaxis_title='الموضع',
-        yaxis_title='القيمة',
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(15,25,45,0.8)',
-        font_color='white',
-        legend=dict(bgcolor='rgba(0,0,0,0.3)'),
-        height=420
-    )
-    st.plotly_chart(fig1, use_container_width=True)
-
-    # العداد التراكمي
-    acc_trace = []
-    acc_running = 0.0
-    for v in data_show:
-        if v >= threshold:
-            acc_trace.append(acc_running)
-            acc_running = 0.0
-        else:
-            acc_running += v
-            acc_trace.append(acc_running)
-
-    fig_acc = go.Figure()
-    fig_acc.add_trace(go.Scatter(
-        x=idx_show, y=acc_trace,
-        mode='lines',
-        fill='tozeroy',
-        name='العداد',
-        line=dict(color='#00d4ff', width=1.5),
-        fillcolor='rgba(0,212,255,0.1)'
-    ))
-    fig_acc.update_layout(
-        title='العداد التراكمي عبر الزمن',
-        xaxis_title='الموضع',
-        yaxis_title='قيمة العداد',
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(15,25,45,0.8)',
-        font_color='white',
-        height=280
-    )
-    st.plotly_chart(fig_acc, use_container_width=True)
-
-# --- التبويب 2: العداد مقابل القفزة ---
-with tab2:
-    x_pts = model['x']
-    y_pts = model['y']
-
-    s_ls = model['slope']
-    b_ls = model['intercept']
-    x_line = np.linspace(float(x_pts.min()), float(x_pts.max()), 100)
-    y_line = s_ls * x_line + b_ls
-
-    fig2 = go.Figure()
-
-    # نقاط البيانات
-    fig2.add_trace(go.Scatter(
-        x=x_pts, y=y_pts,
-        mode='markers',
-        name='دورات فعلية',
-        marker=dict(
-            color=y_pts,
-            colorscale='Viridis',
-            size=8,
-            showscale=True,
-            colorbar=dict(title='قيمة القفزة')
-        )
-    ))
-
-    # خط الانحدار
-    fig2.add_trace(go.Scatter(
-        x=x_line, y=y_line,
-        mode='lines',
-        name=f'y = {s_ls:.3f}x + {b_ls:.3f}  (R²={model["r2"]:.3f})',
-        line=dict(color='#ff6b6b', width=2, dash='dash')
-    ))
-
-    # نقطة التوقع الحالية
-    fig2.add_trace(go.Scatter(
-        x=[acc_now], y=[p],
-        mode='markers',
-        name=f'التوقع الحالي ({p:.2f})',
-        marker=dict(color='#00ff88', size=14, symbol='star')
-    ))
-
-    # نطاق الثقة
-    y_lo = s_ls * x_line + b_ls - margin
-    y_hi = s_ls * x_line + b_ls + margin
-    fig2.add_trace(go.Scatter(
-        x=np.concatenate([x_line, x_line[::-1]]),
-        y=np.concatenate([y_hi, y_lo[::-1]]),
-        fill='toself',
-        fillcolor='rgba(255,107,107,0.1)',
-        line=dict(color='rgba(0,0,0,0)'),
-        name='نطاق الثقة'
-    ))
-
-    fig2.update_layout(
-        title='العلاقة بين العداد والقفزة (اكتشاف المعامل الخفي)',
-        xaxis_title='العداد قبل القفزة',
-        yaxis_title='قيمة القفزة',
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(15,25,45,0.8)',
-        font_color='white',
-        legend=dict(bgcolor='rgba(0,0,0,0.3)'),
-        height=480
-    )
-    st.plotly_chart(fig2, use_container_width=True)
-
-    # إحصاءات الارتباط
-    corr = float(np.corrcoef(x_pts, y_pts)[0, 1])
-    c1, c2, c3 = st.columns(3)
-    c1.metric("معامل الارتباط r", f"{corr:.4f}")
-    c2.metric("R²", f"{model['r2']:.4f}")
-    c3.metric("عدد النقاط", model['n_points'])
-
-# --- التبويب 3: توزيع القفزات ---
-with tab3:
-    fig3 = make_subplots(
-        rows=2, cols=2,
-        subplot_titles=[
-            'توزيع قيم القفزات',
-            'توزيع أطوال الدورات',
-            'القفزات عبر الزمن (آخر 50)',
-            'العداد مقابل التوقع'
-        ]
-    )
-
-    # هيستوغرام القفزات
-    fig3.add_trace(
-        go.Histogram(
-            x=all_jumps, nbinsx=20,
-            name='القفزات',
-            marker_color='#4a9eff',
-            opacity=0.8
-        ),
-        row=1, col=1
-    )
-
-    # هيستوغرام أطوال الدورات
-    lengths = [c['n_charges'] for c in cycles]
-    fig3.add_trace(
-        go.Histogram(
-            x=lengths, nbinsx=15,
-            name='الأطوال',
-            marker_color='#ff6b6b',
-            opacity=0.8
-        ),
-        row=1, col=2
-    )
-
-    # آخر 50 قفزة
-    last50_j = all_jumps[-50:]
-    last50_i = list(range(len(all_jumps) - len(last50_j), len(all_jumps)))
-    fig3.add_trace(
-        go.Bar(
-            x=last50_i, y=last50_j,
-            name='آخر قفزة',
-            marker_color=[
-                '#00ff88' if j >= ceiling * 0.75 else
-                '#ffa500' if j >= ceiling * 0.40 else '#4a9eff'
-                for j in last50_j
-            ]
-        ),
-        row=2, col=1
-    )
-
-    # العداد قبل القفزة مقابل التوقع
-    acc_vals  = [c['acc_before'] for c in cycles if c['acc_before'] > 2]
-    pred_vals = [model['slope'] * a + model['intercept'] for a in acc_vals]
-    real_vals = [c['jump'] for c in cycles if c['acc_before'] > 2]
-
-    fig3.add_trace(
-        go.Scatter(
-            x=acc_vals, y=real_vals,
-            mode='markers', name='فعلي',
-            marker=dict(color='#4a9eff', size=6)
-        ),
-        row=2, col=2
-    )
-    fig3.add_trace(
-        go.Scatter(
-            x=acc_vals, y=pred_vals,
-            mode='markers', name='متوقع',
-            marker=dict(color='#ff6b6b', size=6, symbol='x')
-        ),
-        row=2, col=2
-    )
-
-    fig3.update_layout(
-        height=620,
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(15,25,45,0.8)',
-        font_color='white',
-        showlegend=False
-    )
-    st.plotly_chart(fig3, use_container_width=True)
-
-    # إحصاءات القفزات
-    st.markdown("### 📋 إحصاءات شاملة")
-    stats_col1, stats_col2 = st.columns(2)
-
-    with stats_col1:
-        st.markdown("**إحصاءات القفزات**")
-        jstats = {
-            "العدد"               : len(all_jumps),
-            "المتوسط"             : f"{np.mean(all_jumps):.3f}",
-            "الوسيط"              : f"{np.median(all_jumps):.3f}",
-            "الانحراف المعياري"   : f"{np.std(all_jumps):.3f}",
-            "الحد الأدنى"         : f"{min(all_jumps):.2f}",
-            "الحد الأقصى (السقف)": f"{max(all_jumps):.2f}",
-        }
-        for k, v in jstats.items():
-            st.markdown(
-                f"<div style='display:flex;justify-content:space-between;"
-                f"padding:3px 0;border-bottom:1px solid #1a3a5c;'>"
-                f"<span style='color:#87ceeb;'>{k}</span>"
-                f"<span style='color:#00d4ff;font-weight:bold;'>{v}</span>"
-                f"</div>",
-                unsafe_allow_html=True
-            )
-
-    with stats_col2:
-        st.markdown("**إحصاءات الدورات**")
-        cstats = {
-            "عدد الدورات"         : len(cycles),
-            "متوسط الطول"         : f"{np.mean(lengths):.1f}",
-            "وسيط الطول"          : f"{np.median(lengths):.1f}",
-            "أقصر دورة"           : min(lengths),
-            "أطول دورة"           : max(lengths),
-            "العداد الحالي"       : f"{acc_now:.4f}",
-        }
-        for k, v in cstats.items():
-            st.markdown(
-                f"<div style='display:flex;justify-content:space-between;"
-                f"padding:3px 0;border-bottom:1px solid #1a3a5c;'>"
-                f"<span style='color:#87ceeb;'>{k}</span>"
-                f"<span style='color:#00d4ff;font-weight:bold;'>{v}</span>"
-                f"</div>",
-                unsafe_allow_html=True
-            )
-
-# --- التبويب 4: الاختبار الخلفي ---
-with tab4:
-    bt_df, bt_acc = backtest(cycles, model, n=n_backtest)
-
-    if bt_df is not None:
-        # مقياس الدقة
+    # شرح Kelly
+    with st.expander("📖 كيف يعمل Kelly Criterion؟"):
         st.markdown(f"""
-        <div style="background:linear-gradient(135deg,#0d2137,#1a4a6b);
-                    border-radius:12px; padding:20px; text-align:center;
-                    margin-bottom:20px;">
-            <div style="color:#aaa; font-size:0.9em;">
-                دقة النموذج (خطأ &lt; 30%)
+        **معادلة Kelly:**
+        ```
+        f* = (b × p - q) / b
+        ```
+        حيث:
+        - **p** = احتمال الفوز = **{kelly_info['p']:.4f}**
+        - **q** = احتمال الخسارة = **{kelly_info['q']:.4f}**
+        - **b** = متوسط المضاعف عند الفوز = **{kelly_info['b']:.4f}**
+        - **f*** = نسبة رأس المال المُراهن = **{kelly_info['kelly_pct']:.2f}%**
+
+        **لماذا نصف Kelly؟**
+        - Kelly الكامل يعطي أعلى نمو نظرياً
+        - لكنه ينطوي على تذبذب عالٍ جداً
+        - نصف Kelly يقلل التذبذب بـ 50% مع تقليل النمو بـ 25% فقط
+        """)
+
+    # محاكاة الاستراتيجيات
+    st.markdown(
+        "<div class='section-title'>📊 مقارنة الاستراتيجيات</div>",
+        unsafe_allow_html=True
+    )
+
+    sim   = sim_data
+    x_sim = list(range(len(sim['conservative'])))
+
+    fig_sim = go.Figure()
+    fig_sim.add_trace(go.Scatter(
+        x=x_sim, y=sim['conservative'],
+        mode='lines', name='محافظ (1%)',
+        line=dict(color='#4a9eff', width=1.5)
+    ))
+    fig_sim.add_trace(go.Scatter(
+        x=x_sim, y=sim['kelly'],
+        mode='lines',
+        name=f'نصف Kelly ({sim["f_kelly"]*100:.1f}%)',
+        line=dict(color='#00ff88', width=2)
+    ))
+    fig_sim.add_trace(go.Scatter(
+        x=x_sim, y=sim['aggressive'],
+        mode='lines', name='متهور (10%)',
+        line=dict(color='#ff4444', width=1.5)
+    ))
+    fig_sim.add_hline(
+        y=capital, line_dash='dot',
+        line_color='white', opacity=0.3,
+        annotation_text="رأس المال الأصلي"
+    )
+    fig_sim.update_layout(
+        title="محاكاة رأس المال عبر الزمن - 3 استراتيجيات",
+        xaxis_title="الجولة",
+        yaxis_title="رأس المال",
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(15,25,45,0.8)',
+        font_color='white',
+        legend=dict(bgcolor='rgba(0,0,0,0.3)'),
+        height=420,
+    )
+    st.plotly_chart(fig_sim, use_container_width=True)
+
+    # نتائج المحاكاة
+    sim_results = st.columns(3)
+    strategies  = [
+        ("محافظ 1%",
+         sim['conservative'],
+         "#4a9eff"),
+        (f"نصف Kelly {sim['f_kelly']*100:.1f}%",
+         sim['kelly'],
+         "#00ff88"),
+        ("متهور 10%",
+         sim['aggressive'],
+         "#ff4444"),
+    ]
+    for col, (name, caps, clr) in zip(sim_results, strategies):
+        final     = caps[-1]
+        change    = (final - capital) / capital * 100
+        min_cap   = min(caps)
+        drawdown  = (min_cap - capital) / capital * 100
+        with col:
+            st.markdown(f"""
+            <div class="card" style="border-color:{clr}40;">
+                <div class="card-title">{name}</div>
+                <div class="card-value" style="color:{clr};">
+                    {final:,.0f}
+                </div>
+                <div class="card-sub">
+                    التغير: {change:+.1f}%<br>
+                    أدنى نقطة: {min_cap:,.0f}
+                    ({drawdown:.1f}%)
+                </div>
+            </div>""", unsafe_allow_html=True)
+
+# ══════════════════════════════════════════════════════════════
+# التبويب 4: Stop Loss / Take Profit
+# ══════════════════════════════════════════════════════════════
+with tab4:
+    st.markdown(
+        "<div class='section-title'>"
+        "🛡️ تحليل حدود الخسارة والربح"
+        "</div>",
+        unsafe_allow_html=True
+    )
+
+    sl_col1, sl_col2 = st.columns(2)
+
+    with sl_col1:
+        st.markdown(f"""
+        <div class="card">
+            <div class="card-title">🔴 Stop Loss</div>
+            <div class="card-value" style="color:#ff4444;">
+                {sl_info['sl_level']:,.0f}
             </div>
-            <div style="font-size:2.5em; font-weight:bold;
-                        color:{'#00ff88' if bt_acc>=65 else
-                               '#ffa500' if bt_acc>=45 else '#ff4444'};">
-                {bt_acc:.1f}%
-            </div>
-            <div style="color:#87ceeb; font-size:0.85em;">
-                على آخر {n_backtest} دورة
+            <div class="card-sub">
+                -{sl_pct}% من رأس المال ({capital:,.0f})<br>
+                تفعيل عند الوصول لهذا المستوى
             </div>
         </div>""", unsafe_allow_html=True)
 
-        # رسم الفعلي مقابل المتوقع
-        fig_bt = go.Figure()
-        x_bt = list(range(len(bt_df)))
+    with sl_col2:
+        st.markdown(f"""
+        <div class="card" style="border-color:#00ff88;">
+            <div class="card-title">🟢 Take Profit</div>
+            <div class="card-value" style="color:#00ff88;">
+                {sl_info['tp_level']:,.0f}
+            </div>
+            <div class="card-sub">
+                +{tp_pct}% من رأس المال ({capital:,.0f})<br>
+                جني الأرباح عند هذا المستوى
+            </div>
+        </div>""", unsafe_allow_html=True)
 
-        fig_bt.add_trace(go.Bar(
-            x=x_bt, y=bt_df['القفزة الفعلية'],
-            name='فعلي', marker_color='#4a9eff', opacity=0.8
-        ))
-        fig_bt.add_trace(go.Scatter(
-            x=x_bt, y=bt_df['التوقع'],
-            mode='lines+markers', name='متوقع',
-            line=dict(color='#ff6b6b', width=2),
-            marker=dict(size=8)
-        ))
-        fig_bt.update_layout(
-            title='الفعلي مقابل المتوقع (آخر دورات)',
-            xaxis_title='رقم الدورة',
-            yaxis_title='القيمة',
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(15,25,45,0.8)',
-            font_color='white',
-            legend=dict(bgcolor='rgba(0,0,0,0.3)'),
-            height=350
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # رسم مناطق الخطر والأمان
+    sl_val = sl_info['sl_level']
+    tp_val = sl_info['tp_level']
+
+    fig_zones = go.Figure()
+
+    # منطقة الخطر
+    fig_zones.add_hrect(
+        y0=0, y1=sl_val,
+        fillcolor='rgba(255,68,68,0.08)',
+        line_width=0,
+        annotation_text="🔴 منطقة الخطر",
+        annotation_position="left"
+    )
+    # منطقة الأمان
+    fig_zones.add_hrect(
+        y0=sl_val, y1=tp_val,
+        fillcolor='rgba(74,158,255,0.05)',
+        line_width=0,
+        annotation_text="🔵 منطقة الأمان",
+        annotation_position="left"
+    )
+    # منطقة الربح
+    fig_zones.add_hrect(
+        y0=tp_val, y1=tp_val * 2,
+        fillcolor='rgba(0,255,136,0.05)',
+        line_width=0,
+        annotation_text="🟢 منطقة الربح",
+        annotation_position="left"
+    )
+
+    # محاكاة رأس المال
+    cap_trace = []
+    cap_run   = float(capital)
+    for val in data[-200:]:
+        bet = cap_run * kelly_info['half_kelly']
+        if val >= mult_thresh:
+            cap_run += bet * (val - 1)
+        else:
+            cap_run -= bet
+        cap_run = max(0, cap_run)
+        cap_trace.append(round(cap_run, 2))
+
+    fig_zones.add_trace(go.Scatter(
+        x=list(range(len(cap_trace))),
+        y=cap_trace,
+        mode='lines',
+        name='رأس المال',
+        line=dict(color='#00d4ff', width=2)
+    ))
+    fig_zones.add_hline(
+        y=sl_val, line_dash='dash',
+        line_color='#ff4444', line_width=2,
+        annotation_text=f"Stop Loss: {sl_val:,.0f}"
+    )
+    fig_zones.add_hline(
+        y=float(capital), line_dash='dot',
+        line_color='white', opacity=0.4,
+        annotation_text=f"البداية: {capital:,.0f}"
+    )
+    fig_zones.add_hline(
+        y=tp_val, line_dash='dash',
+        line_color='#00ff88', line_width=2,
+        annotation_text=f"Take Profit: {tp_val:,.0f}"
+    )
+    fig_zones.update_layout(
+        title="محاكاة رأس المال مع مناطق Stop Loss / Take Profit",
+        xaxis_title="الجولة",
+        yaxis_title="رأس المال",
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(15,25,45,0.8)',
+        font_color='white',
+        legend=dict(bgcolor='rgba(0,0,0,0.3)'),
+        height=420,
+    )
+    st.plotly_chart(fig_zones, use_container_width=True)
+
+    # إرشادات Stop Loss
+    st.markdown(
+        "<div class='section-title'>📚 إرشادات إدارة رأس المال</div>",
+        unsafe_allow_html=True
+    )
+    guidelines = [
+        ("🔴 Stop Loss إلزامي",
+         f"أوقف اللعب فوراً عند خسارة {sl_pct}% "
+         f"({sl_val:,.0f}). لا استثناءات.",
+         "rec-danger"),
+        ("🟢 Take Profit منضبط",
+         f"اسحب الأرباح أو توقف عند تحقيق {tp_pct}% "
+         f"ربح ({tp_val:,.0f}). لا تنتظر أكثر.",
+         "rec-warn"),
+        ("💰 حجم الرهان الثابت",
+         f"لا تتجاوز {kelly_info['half_pct']:.1f}% من رأس المال "
+         f"لكل جولة (نصف Kelly).",
+         "rec-strong"),
+        ("⏰ حدود زمنية",
+         "حدد عدداً أقصى من الجولات قبل البدء والتزم به.",
+         "rec-warn"),
+        ("🧠 القرار البارد",
+         "لا تزد رهانك بعد الخسارة. الخسارة السابقة "
+         "لا تغير احتمالات المستقبل.",
+         "rec-danger"),
+    ]
+    for title, body, cls in guidelines:
+        st.markdown(f"""
+        <div class="{cls}">
+            <strong>{title}</strong><br>
+            <span style="font-size:0.9em; opacity:0.9;">{body}</span>
+        </div>""", unsafe_allow_html=True)
+
+# ══════════════════════════════════════════════════════════════
+# التبويب 5: التوصيات الشاملة
+# ══════════════════════════════════════════════════════════════
+with tab5:
+    st.markdown(
+        "<div class='section-title'>📋 لوحة التوصيات الشاملة</div>",
+        unsafe_allow_html=True
+    )
+
+    # ملخص الوضع
+    is_rand    = rand_tests['verdict']['random']
+    k_pct      = kelly_info['half_pct']
+    win_rate   = kelly_info['p'] * 100
+    avg_win    = kelly_info['b']
+
+    # مؤشر الجودة الإجمالية
+    quality_score = 0
+    if win_rate >= 30:
+        quality_score += 25
+    if avg_win >= 2.5:
+        quality_score += 25
+    if k_pct >= 2:
+        quality_score += 25
+    if not is_rand:
+        quality_score += 25
+
+    q_color = (
+        "#00ff88" if quality_score >= 75 else
+        "#ffa500" if quality_score >= 50 else
+        "#ff4444"
+    )
+    q_label = (
+        "ظروف جيدة نسبياً" if quality_score >= 75 else
+        "ظروف متوسطة"      if quality_score >= 50 else
+        "ظروف صعبة"
+    )
+
+    # مؤشر Gauge
+    fig_gauge = go.Figure(go.Indicator(
+        mode  = "gauge+number+delta",
+        value = quality_score,
+        title = {'text': "مؤشر جودة الظروف",
+                 'font': {'color': 'white', 'size': 16}},
+        number= {'suffix': "/100",
+                 'font': {'color': q_color, 'size': 32}},
+        gauge = {
+            'axis' : {'range': [0, 100], 'tickcolor': 'gray'},
+            'bar'  : {'color': q_color},
+            'steps': [
+                {'range': [0,  50], 'color': 'rgba(255,68,68,0.15)'},
+                {'range': [50, 75], 'color': 'rgba(255,165,0,0.15)'},
+                {'range': [75,100], 'color': 'rgba(0,255,136,0.15)'},
+            ],
+            'bgcolor': 'rgba(0,0,0,0)'
+        }
+    ))
+    fig_gauge.update_layout(
+        height=260,
+        margin=dict(t=60, b=10, l=30, r=30),
+        paper_bgcolor='rgba(0,0,0,0)',
+        font_color='white'
+    )
+
+    g_col, s_col = st.columns([1, 1])
+
+    with g_col:
+        st.plotly_chart(fig_gauge, use_container_width=True)
+        st.markdown(
+            f"<div style='text-align:center; color:{q_color}; "
+            f"font-size:1.2em; font-weight:bold;'>{q_label}</div>",
+            unsafe_allow_html=True
         )
-        st.plotly_chart(fig_bt, use_container_width=True)
 
-        # رسم توزيع الخطأ %
-        fig_err = go.Figure()
-        err_colors = [
-            '#00ff88' if e < 30 else
-            '#ffa500' if e < 55 else '#ff4444'
-            for e in bt_df['الخطأ %']
+    with s_col:
+        summary_items = [
+            ("احتمال الفوز (≥{:.1f}x)".format(mult_thresh),
+             f"{win_rate:.1f}%",
+             "#ffa500"),
+            ("متوسط المضاعف عند الفوز",
+             f"{avg_win:.2f}x",
+             "#00d4ff"),
+            ("نصف Kelly الموصى به",
+             f"{k_pct:.2f}%",
+             "#00ff88"),
+            ("البيانات عشوائية؟",
+             "نعم ⚠️" if is_rand else "غير مؤكد 🔍",
+             "#ffa500" if is_rand else "#ff6b6b"),
+            ("Stop Loss عند",
+             f"{sl_info['sl_level']:,.0f} (-{sl_pct}%)",
+             "#ff4444"),
+            ("Take Profit عند",
+             f"{sl_info['tp_level']:,.0f} (+{tp_pct}%)",
+             "#00ff88"),
         ]
-        fig_err.add_trace(go.Bar(
-            x=x_bt, y=bt_df['الخطأ %'],
-            marker_color=err_colors,
-            name='الخطأ %'
-        ))
-        fig_err.add_hline(
-            y=30, line_dash='dash',
-            line_color='#ffa500',
-            annotation_text="حد القبول 30%"
-        )
-        fig_err.update_layout(
-            title='توزيع نسبة الخطأ لكل دورة',
-            xaxis_title='رقم الدورة',
-            yaxis_title='الخطأ %',
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(15,25,45,0.8)',
-            font_color='white',
-            height=280
-        )
-        st.plotly_chart(fig_err, use_container_width=True)
+        st.markdown("<br>", unsafe_allow_html=True)
+        for label, value, color in summary_items:
+            st.markdown(f"""
+            <div style="display:flex; justify-content:space-between;
+                        padding:8px 4px;
+                        border-bottom:1px solid #1a3a5c;">
+                <span style="color:#87ceeb;">{label}</span>
+                <span style="color:{color}; font-weight:bold;">
+                    {value}
+                </span>
+            </div>""", unsafe_allow_html=True)
 
-        # جدول التفاصيل
-        with st.expander("📋 جدول تفاصيل الاختبار الخلفي"):
-            st.dataframe(
-                bt_df.style.map(
-                    lambda v: 'color: #00ff88' if v == '✅' else
-                              'color: #ffa500' if v == '⚠️' else
-                              'color: #ff4444',
-                    subset=['الحكم']
-                ),
-                use_container_width=True,
-                height=400
-            )
+    # التوصيات التفصيلية
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown(
+        "<div class='section-title'>🎯 التوصيات التفصيلية</div>",
+        unsafe_allow_html=True
+    )
+
+    recs = []
+
+    # توصية 1: حجم الرهان
+    if k_pct < 1:
+        recs.append((
+            "rec-danger",
+            "⛔ لا يُنصح بالمشاركة",
+            f"Kelly يعطي {k_pct:.2f}% فقط مما يعني أن الأفضلية "
+            "ليست في صالحك. المشاركة بأي مبلغ ليست مُجدية إحصائياً."
+        ))
+    elif k_pct < 3:
+        recs.append((
+            "rec-warn",
+            "⚠️ رهانات صغيرة جداً فقط",
+            f"Kelly = {k_pct:.2f}% → ارهن بـ {k_pct:.1f}% من رأس المال "
+            f"كحد أقصى ({capital * k_pct/100:,.0f} لكل جولة)."
+        ))
     else:
-        st.warning("بيانات غير كافية للاختبار الخلفي")
+        recs.append((
+            "rec-strong",
+            "✅ حجم رهان معقول",
+            f"Kelly = {k_pct:.2f}% → ارهن بـ {k_pct:.1f}% "
+            f"({capital * k_pct/100:,.0f} لكل جولة). لا تتجاوز هذا."
+        ))
+
+    # توصية 2: احتمال الفوز
+    if win_rate < 20:
+        recs.append((
+            "rec-danger",
+            "🔴 احتمال فوز منخفض جداً",
+            f"فقط {win_rate:.1f}% من القيم تتجاوز {mult_thresh}x. "
+            "هذا يعني خسارة في 4 من كل 5 جولات تقريباً."
+        ))
+    elif win_rate < 35:
+        recs.append((
+            "rec-warn",
+            "🟡 احتمال فوز متوسط",
+            f"{win_rate:.1f}% من القيم تتجاوز {mult_thresh}x. "
+            "المفتاح هو ضبط حجم الرهان بدقة."
+        ))
+    else:
+        recs.append((
+            "rec-strong",
+            "🟢 احتمال فوز معقول",
+            f"{win_rate:.1f}% من القيم تتجاوز {mult_thresh}x. "
+            "لكن تذكر: الماضي لا يضمن المستقبل."
+        ))
+
+    # توصية 3: العشوائية
+    if is_rand:
+        recs.append((
+            "rec-warn",
+            "⚠️ البيانات تبدو عشوائية",
+            "اجتازت البيانات اختبارات العشوائية. هذا يعني أن "
+            "أي نمط تراه قد يكون وهماً إحصائياً (Pareidolia). "
+            "لا تعتمد على أنماط بصرية."
+        ))
+    else:
+        recs.append((
+            "rec-warn",
+            "🔍 تم رصد انحراف عن العشوائية",
+            "بعض الاختبارات أظهرت انحرافاً. لكن هذا لا يعني "
+            "إمكانية التنبؤ المضمون. يحتاج دراسة أعمق بمزيد من البيانات."
+        ))
+
+    # توصية 4: إدارة رأس المال
+    recs.append((
+        "rec-strong",
+        "💡 القاعدة الذهبية لإدارة رأس المال",
+        f"Stop Loss عند {sl_info['sl_level']:,.0f} (-{sl_pct}%) | "
+        f"Take Profit عند {sl_info['tp_level']:,.0f} (+{tp_pct}%) | "
+        f"لا تتجاوز {k_pct:.1f}% لكل رهان. هذه الثلاثة معاً هي درعك الواقي."
+    ))
+
+    # توصية 5: تحذير نهائي
+    recs.append((
+        "rec-danger",
+        "🚨 تحذير: مغالطة القمار",
+        "الخسارة المتتالية لا تعني أن الفوز 'واجب' قادماً. "
+        "كل جولة مستقلة إحصائياً. لا تزد رهانك بعد الخسارة أبداً. "
+        "هذا هو أكثر الأخطاء تدميراً."
+    ))
+
+    for cls, title, body in recs:
+        st.markdown(f"""
+        <div class="{cls}" style="margin:10px 0;">
+            <strong style="font-size:1.05em;">{title}</strong><br>
+            <span style="font-size:0.92em; opacity:0.9;
+                         line-height:1.5;">{body}</span>
+        </div>""", unsafe_allow_html=True)
+
+    # حاسبة رأس المال التفاعلية
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown(
+        "<div class='section-title'>🧮 حاسبة الرهان التفاعلية</div>",
+        unsafe_allow_html=True
+    )
+
+    calc_col1, calc_col2 = st.columns(2)
+    with calc_col1:
+        my_capital = st.number_input(
+            "رأس مالي الحالي", 10, 1_000_000,
+            int(capital), 10
+        )
+        my_strategy = st.selectbox(
+            "الاستراتيجية",
+            ["محافظ (0.5%)", "نصف Kelly", "كامل Kelly", "مخصص"]
+        )
+        if my_strategy == "مخصص":
+            custom_pct = st.slider("نسبة مخصصة %", 0.1, 25.0, 2.0, 0.1)
+        else:
+            custom_pct = None
+
+    with calc_col2:
+        if my_strategy == "محافظ (0.5%)":
+            bet_pct = 0.5
+        elif my_strategy == "نصف Kelly":
+            bet_pct = kelly_info['half_pct']
+        elif my_strategy == "كامل Kelly":
+            bet_pct = kelly_info['kelly_pct']
+        else:
+            bet_pct = custom_pct or 2.0
+
+        bet_amount = my_capital * bet_pct / 100
+        sl_amount  = my_capital * sl_pct  / 100
+        tp_amount  = my_capital * tp_pct  / 100
+
+        st.markdown(f"""
+        <div class="card" style="margin-top:10px;">
+            <div class="card-title">نتائج الحاسبة</div>
+            <br>
+            <div style="display:flex; justify-content:space-between;
+                        padding:6px 0; border-bottom:1px solid #1a3a5c;">
+                <span style="color:#87ceeb;">مبلغ الرهان</span>
+                <span style="color:#00ff88; font-weight:bold;">
+                    {bet_amount:,.2f} ({bet_pct:.2f}%)
+                </span>
+            </div>
+            <div style="display:flex; justify-content:space-between;
+                        padding:6px 0; border-bottom:1px solid #1a3a5c;">
+                <span style="color:#87ceeb;">حد الخسارة</span>
+                <span style="color:#ff4444; font-weight:bold;">
+                    -{sl_amount:,.2f}
+                </span>
+            </div>
+            <div style="display:flex; justify-content:space-between;
+                        padding:6px 0; border-bottom:1px solid #1a3a5c;">
+                <span style="color:#87ceeb;">هدف الربح</span>
+                <span style="color:#00ff88; font-weight:bold;">
+                    +{tp_amount:,.2f}
+                </span>
+            </div>
+            <div style="display:flex; justify-content:space-between;
+                        padding:6px 0;">
+                <span style="color:#87ceeb;">عدد الرهانات حتى Stop Loss</span>
+                <span style="color:#ffa500; font-weight:bold;">
+                    ~{int(sl_amount / (bet_amount + 0.01))} جولة
+                </span>
+            </div>
+        </div>""", unsafe_allow_html=True)
 
 # ============================================================
 # الفوتر
 # ============================================================
 st.markdown("---")
 st.markdown("""
-<div style="text-align:center; color:#4a6a8a; font-size:0.85em;">
-    نظام التنبؤ الذكي | يعتمد على تحليل الأنماط الإحصائية
-    <br>
-    ⚠️ للأغراض التحليلية فقط — ليس ضماناً للنتائج المستقبلية
+<div style="text-align:center; color:#2a4a6a; font-size:0.82em;
+            line-height:1.8;">
+    📊 المحلل الإحصائي الصادق | بُني بـ Python & Streamlit<br>
+    ⚠️ للأغراض التعليمية والتحليلية فقط ·
+    المقامرة تنطوي على مخاطر مالية حقيقية ·
+    لا تستثمر ما لا تستطيع خسارته
 </div>
 """, unsafe_allow_html=True)

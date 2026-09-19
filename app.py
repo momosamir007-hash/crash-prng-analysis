@@ -1,1544 +1,843 @@
-import streamlit as st
-import numpy as np
+# -*- coding: utf-8 -*-
+"""
+Reconstruction of excel_inspector_pro.py from a Python 3.14 PyInstaller bytecode object.
+
+IMPORTANT:
+    This is a readable reconstruction of the recovered bytecode, not a byte-for-byte
+    recovery of the original source file. Names, strings, constants and the main
+    control-flow/behaviour were recovered from the embedded code object; formatting,
+    comments and some compiler-level details are necessarily reconstructed.
+"""
+
+import sys
+import os
+import json
+import subprocess
 import pandas as pd
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-from scipy import stats
-import warnings
-warnings.filterwarnings('ignore')
 
-# ============================================================
-# إعداد الصفحة
-# ============================================================
-st.set_page_config(
-    page_title="محلل الأنماط الإحصائي",
-    page_icon="📊",
-    layout="wide",
-    initial_sidebar_state="expanded"
+from PyQt6.QtWidgets import (
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+    QPushButton, QTableWidget, QTableWidgetItem, QFileDialog, QComboBox,
+    QLabel, QMessageBox, QHeaderView, QDialog, QDoubleSpinBox, QTextEdit,
+    QTabWidget, QListWidget, QListWidgetItem, QSplitter,
 )
+from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtGui import QColor, QFont, QIcon, QDragEnterEvent, QDropEvent
 
-st.markdown("""
-<style>
-    body { direction: rtl; font-family: 'Segoe UI', sans-serif; }
-
-    .card {
-        background: linear-gradient(135deg, #0d1b2a, #1a3a5c);
-        border-radius: 14px;
-        padding: 22px;
-        margin: 8px 0;
-        border: 1px solid #1e4a7a;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.4);
-    }
-    .card-title {
-        color: #87ceeb;
-        font-size: 0.85em;
-        margin-bottom: 6px;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-    }
-    .card-value {
-        color: #00d4ff;
-        font-size: 2em;
-        font-weight: bold;
-    }
-    .card-sub {
-        color: #4a7a9b;
-        font-size: 0.8em;
-        margin-top: 4px;
-    }
-
-    .result-pass {
-        background: rgba(0,255,136,0.08);
-        border: 1px solid #00ff88;
-        border-radius: 10px;
-        padding: 14px;
-        margin: 6px 0;
-        color: #00ff88;
-    }
-    .result-fail {
-        background: rgba(255,68,68,0.08);
-        border: 1px solid #ff4444;
-        border-radius: 10px;
-        padding: 14px;
-        margin: 6px 0;
-        color: #ff4444;
-    }
-    .result-warn {
-        background: rgba(255,165,0,0.08);
-        border: 1px solid #ffa500;
-        border-radius: 10px;
-        padding: 14px;
-        margin: 6px 0;
-        color: #ffa500;
-    }
-
-    .kelly-box {
-        background: linear-gradient(135deg, #0a2a1a, #0d4a2a);
-        border: 2px solid #00ff88;
-        border-radius: 14px;
-        padding: 24px;
-        text-align: center;
-    }
-    .kelly-value {
-        font-size: 2.8em;
-        font-weight: bold;
-        color: #00ff88;
-    }
-
-    .rec-strong {
-        background: rgba(0,255,136,0.10);
-        border-left: 4px solid #00ff88;
-        border-radius: 8px;
-        padding: 12px 16px;
-        margin: 6px 0;
-        color: #00ff88;
-    }
-    .rec-warn {
-        background: rgba(255,165,0,0.10);
-        border-left: 4px solid #ffa500;
-        border-radius: 8px;
-        padding: 12px 16px;
-        margin: 6px 0;
-        color: #ffa500;
-    }
-    .rec-danger {
-        background: rgba(255,68,68,0.10);
-        border-left: 4px solid #ff4444;
-        border-radius: 8px;
-        padding: 12px 16px;
-        margin: 6px 0;
-        color: #ff4444;
-    }
-
-    .section-title {
-        color: #00d4ff;
-        font-size: 1.4em;
-        font-weight: bold;
-        margin: 20px 0 10px 0;
-        padding-bottom: 6px;
-        border-bottom: 1px solid #1a3a5c;
-    }
-
-    div[data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #070e1a, #0d1f35);
-    }
-
-    .stTabs [data-baseweb="tab"] {
-        color: #87ceeb;
-    }
-    .stTabs [aria-selected="true"] {
-        color: #00d4ff;
-        border-bottom-color: #00d4ff;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-# ============================================================
-# البيانات الافتراضية
-# ============================================================
-DEFAULT_DATA = [
-    8.72, 6.75, 1.86, 2.18, 1.25, 2.28, 1.24, 1.2, 1.54, 24.46, 4.16, 1.49,
-    1.09, 1.47, 1.54, 1.53, 2.1, 32.04, 11, 1.17, 1.7, 2.61, 1.26, 22.23,
-    1.77, 1.93, 3.35, 7.01, 1.83, 9.39, 3.31, 2.04, 1.3, 6.65, 1.16, 3.39,
-    1.95, 10.85, 1.65, 1.22, 1.6, 4.67, 1.85, 2.72, 1, 3.02, 1.35, 1.3,
-    1.37, 17.54, 1.18, 1, 14.4, 1.11, 6.15, 2.39, 2.22, 1.42, 1.23, 2.42,
-    1.07, 1.24, 2.55, 7.26, 1.69, 5.1, 2.59, 5.51, 2.31, 2.12, 1.97, 1.5,
-    3.01, 2.29, 1.36, 4.95, 5.09, 8.5, 1.77, 5.52, 3.93, 1.5, 2.28, 2.49,
-    18.25, 1.68, 1.42, 2.12, 4.17, 1.04, 2.35, 1, 1.01, 5.46, 1.13, 2.84,
-    3.39, 2.79, 1.59, 1.53, 4.34, 2.96, 1.06, 1.72, 2.16, 2.2, 3.61, 2.34,
-    4.49, 1.72, 1.78, 9.27, 8.49, 2.86, 1.66, 4.63, 9.25, 1.35, 1, 1.64,
-    1.86, 2.81, 2.44, 1.74, 1.1, 1.29, 1.45, 8.92, 1.24, 6.39, 1.16, 1.19,
-    2.4, 4.64, 3.17, 24.21, 1.17, 1.42, 2.13, 1.12, 3.78, 1.12, 1.52, 22.81,
-    1.31, 1.9, 1.38, 1.47, 2.86, 1.79, 1.49, 1.38, 1.84, 1.06, 3.3, 5.97,
-    1, 2.92, 1.64, 5.32, 3.26, 1.78, 2.24, 3.16, 1.6, 1.08, 1.55, 1.07,
-    1.02, 1.23, 1.08, 5.22, 3.32, 24.86, 3.37, 5.16, 1.69, 2.31, 1.07, 1.1,
-    1.01, 1.36, 1.38, 1.54, 5.34, 2.68, 5.78, 3.63, 1.89, 8.41, 4.06, 1.44,
-    1.5, 3.17, 1.02, 1.8, 1.9, 1.86, 1.85, 1.73, 3.86, 3.11, 2.44, 1.15,
-    2.03, 1.05, 3.05, 1.88, 10.13, 2.29, 1.41, 1, 5.46, 1.26, 23.33, 1.96,
-    1.03, 4.54, 1.37, 3.5, 1.13, 1.16, 1.43, 1.13, 1.05, 33.27, 9.96, 1.79,
-    2.07, 18.51, 5.75, 1.15, 1.08, 5.92, 1.38, 1.61, 12.99, 24.72, 4.86,
-    1.11, 2.86, 1.54, 3.71, 4, 7.57, 2.03, 2.18, 5.52, 13.37, 3.73, 2.41,
-    1.79, 5.57, 4.36, 12.33, 1.61, 3.28, 2.89, 1.47, 1.08, 26.89, 1.53,
-    2.94, 5.29, 1.23, 1.57, 1.12, 5.69, 3.29, 2.72, 1.18, 5.03, 1.1, 1.32,
-    1.18, 1.07, 1.27, 4.6, 11.68, 1.74, 3.94, 3.63, 1.05, 1.61, 1.62, 2.41,
-    6.9, 2.02, 1.01, 3.22, 17.21, 1.95, 8.8, 1.44, 2.76, 3.1, 2.84, 1.35,
-    1.84, 1.6, 10.72, 1.17, 3.47, 1.45, 1.29, 1.46, 2.23, 12.3, 3.27, 1.23,
-    1.02, 1.66, 3.79, 2.06, 4.55, 7.95, 8.55, 4.08, 2.02, 1.21, 1.19, 1.53,
-    4.9, 1.84, 10.51, 1.01, 1.34, 1.5, 1.4, 1.42, 4.18, 7.99, 1.23, 1.67,
-    3.16, 1.64, 25.06, 4.52, 1.5, 3.23, 1.09, 1.45, 2.77, 7.42, 7.48, 1.89,
-    2.11, 4.1, 1.26, 2.29, 10.12, 1.35, 13.21, 2.36, 22.35, 1.76, 2.22,
-    1.04, 1.18, 3.69, 1.47, 10.2, 1.47, 1.68, 2.45, 1.03, 2.04, 1.47, 1.18,
-    1.72, 1, 3.25, 1.1, 8.74, 1.01, 1.54, 1.34, 5.22, 5.31, 4.47, 2.78,
-    21.37, 3.38, 1.63, 2.21, 2.35, 2.14, 1.46, 1.25, 1.67, 1.08, 3.94, 1.66,
-    31.1, 1.73, 2.18, 2.06, 1.08, 1.11, 1, 1.07, 1.31, 1.55, 1.98, 1.75,
-    1.23, 1.32, 2.56, 3.21, 1.81, 2.09, 1.34, 3.42, 1.29, 1.36, 1.76, 1.61,
-    4.52, 1.08, 1.97, 3.75, 1.8, 6.36, 1.14, 1.72, 2.39, 1.28, 4.22, 2.12,
-    1.28, 1.38, 1.42, 28.26, 2.15, 1.31, 1.65, 2.43, 2.76, 1.54, 1.61,
-    11.91, 2.93, 8.1, 2.04, 1.84, 1.26, 3.69, 3.97, 3.01, 3.16, 1.3, 7.9,
-    1.72, 5.57, 2.42, 1.74, 2.06, 2.86, 1.56, 1.4, 2.35, 2.82, 4.03, 1.28,
-    2.21, 1.1, 2.06, 1.14, 1.58, 27.78, 2.04, 1.52, 1.22, 1.4, 1.29, 1.16,
-    11.72, 1.33, 1.3, 4.34, 1.02, 1.63, 1.9, 9, 1.42, 3.13, 3.8, 1.02,
-    1.25, 2.45, 1.74, 1.06, 1.38, 3.46, 1.08, 1, 1.02, 1.84, 1, 1.77, 3.07,
-    5.26, 1.73, 1.07, 3.75, 2.32, 1.6, 1.22, 1.72, 2.01, 1.11, 2.03, 1.17,
-    1.98, 2.18, 34.49, 1.2, 10.3, 3.4, 2.58, 2.2, 3.16, 29.22, 4.26, 3.18,
-    3.29, 1.09, 2.3, 1.25, 3.05, 2.99, 2.16, 3.02, 2.21, 1.59, 5.74, 1.02,
-    1.12, 1.21, 2.25, 4.38, 1.05, 1.05, 1.9, 23.03, 4.93, 1.03, 16.7, 4.08,
-    1.68, 2.4, 2.89, 2.85, 2.75, 20.29, 3.57, 9.68, 1.46, 5.73, 4.84, 1.15,
-    1.92, 3.71, 3.41, 22.67, 15.65, 1.86, 3.41, 1.89, 1.01, 3.02, 13.81,
-    1.55, 1.16, 6.35, 5.6, 2.55, 16.8, 5.48, 1.49, 2.07, 1.05, 1.49, 6.29,
-    1.32, 23.22, 1.07, 1.65, 20.07, 1.14, 1.1, 18.38, 4.34, 3.8, 6.17, 2.27,
-    1.69, 1.07, 3.74, 1.6, 1.02, 1.45, 1.86, 5.13, 1.57, 6.93, 15.82, 1,
-    1.16, 4.14, 1.08, 2.35, 2.15, 13.52, 10.87, 9.85, 1.97, 1, 3.46, 1.31,
-    3.28, 2.74, 1.98, 2.22, 1, 9.95, 1.41, 1.43, 2.13, 4.6, 2.68, 4.13,
-    1.61, 1.46, 1.23, 9.57, 1.14, 1.17, 14.27, 4.01, 5.55, 1.95, 2.48, 1.78,
-    2.21, 1.65, 1.08, 2.63, 8.53, 2.2, 1.33, 21.72, 1.3, 1.43, 6.37, 1.09,
-    3.94, 1.88, 3.38, 1.66, 1.41, 22.99, 1.55, 7.5, 25.48, 2.21, 3.62, 1.68,
-    9.92, 3.4, 2.66, 1.03, 4.63, 1.89, 1.77, 1.9, 1.01, 1.81, 32.39, 2.1,
-    1.23, 6.26, 9.06, 1.17, 2.41, 2.52, 1.63, 5.61, 1, 2.63, 1.88, 1.5,
-    23.8, 5.65, 1.05, 1.07, 2.05, 1.7, 2.4, 18.27, 3.68, 13.17, 4.99, 20.81,
-    1.51, 6.33, 9.85, 10.15, 17.05, 27.6, 4.65, 3.18, 2.54, 3.92, 4.74,
-    1.81, 1.91, 4.42, 1.57, 2.17, 1.25, 1.03, 1.15, 1.19, 13.97, 2.39, 1.34,
-    2.52, 1.47, 2.91, 2.31, 1.29, 1.61, 4.13, 1.83, 2.96, 1.08, 1.28, 13.53,
-    1.15, 1.51, 1.31, 3.45, 9.32, 5.42, 3.27, 2.56, 2.07, 1.83, 14.1, 15.36,
-    1.93, 1.47, 16.96, 1.61, 2.38, 2.66, 1.28, 1.46, 3.09, 6.73, 1.12, 1.85,
-    3.21, 1.15, 3.71, 1.64, 4.88, 11.09, 3.82, 2.49, 21.23, 2.01, 2.47,
-    2.47, 2.19, 2.14, 1, 2.09, 1.03, 5.22, 1.65, 1.13, 14.43, 1.68, 1.86,
-    1.21, 1.14, 1.47, 1.26, 3.44, 23.9, 2.53, 2.72, 1, 1.13, 3.34, 1.43, 1,
-    2.48, 2.01, 2.22, 6.43, 1.81, 2.12, 1.3, 4.02, 1.79, 3.9, 1.3, 5.04,
-    1.77, 6.67, 2.21, 1.58, 5.38, 2.79, 6.12, 2.95, 1.14, 1.19, 1.19, 10.23,
-    17.96, 10.1, 2.4, 9.29, 1.28, 4.07, 1.64, 2.1, 2.67, 1.08, 16.82, 2.83,
-    24.42, 1.01, 3.24, 5.05, 3.24, 1.56, 2.32, 1.23, 1.72, 3.39, 1.96, 1.18,
-    3.21, 23.95, 9.46, 23.12, 1.45, 3.22, 5, 2.04, 2.73, 6.28, 1.21, 14.3,
-    1.48, 3.3, 3.73, 4.09, 2.88, 8.83, 1.15, 4.58, 4.23, 2.34, 2, 11.38,
-    1.81, 1.03, 1.76, 2.41, 2.5, 5.82, 2.18, 10.19, 2.08, 18.19, 4.22, 7.78,
-    1.96, 1.43, 1.08, 2.38, 1.37, 1.21, 4.48, 1.64, 1.62, 21.24, 1.22, 7.99,
-    1.13, 1.29, 2.36, 3.94, 1.08, 1.41, 1.97, 1.41, 1.95, 1.28, 4.56, 3.35,
-    1.37, 1.18, 1.03, 3.67, 1.43, 1.8, 2.48, 11.95, 1.5, 3.52, 2.03, 1,
-    1.1, 10.13, 1.44, 14.19, 2.1, 8.46, 1.06, 1.66, 1.2, 7.22, 1.75, 1.78,
-    3.76, 2.21, 1, 25.19, 5.96, 5.42, 2.67, 1.37, 1.39, 15.95, 2.8, 1.76,
-    1.7, 2.81, 8.87, 1.48, 1.03, 1.14, 1.05, 10.29, 1.71, 23.98, 2.34, 1.97,
-    1.33, 24.02, 2.01, 13.74, 2.5, 1.33, 1.02, 1.76, 1.37, 8.97, 1.27, 1.38,
-    4.47, 1.38, 3.02, 17, 13.35, 1.07, 1.38, 5.74, 6.68, 24.72, 1.47, 1.25,
-    4.51, 4.47, 1.99, 1.15, 4.03, 1.17, 3.42, 6.46, 1.31, 1.46, 6.67, 3.79,
-    1.56, 3.98, 1.62, 2.13, 1.07, 4.88, 1.62, 1.5, 6.11, 1.31, 1.85, 1.93,
-    1.09, 1.49, 1.41, 1.24, 1.05, 6.99, 1.33, 1.73, 10.76, 21.77, 1.18,
-    1.06, 5.36, 1.45, 1.16, 6.43, 2.1, 4.15, 1.14, 2.21, 33.48, 2.88, 1,
-    4.7, 1.27, 5.75, 4.97, 1.11, 3.51, 21.47, 1.21, 1.98, 1.11, 1.46, 1.77,
-    1.22, 2.65, 1.66, 5.29, 1.58, 2.03, 5.86, 1.1, 1.68, 1.35, 1.72, 1.15,
-    2.69, 2.81, 3.46, 1.58, 1.07, 7.18, 2.35, 6.05, 1.24, 5.69, 5.46, 1,
-    3.04, 4.76, 1.56, 1.41, 2.43, 7.97, 1.22, 1.94, 1.51, 21.71, 3.03, 1.43,
-    5.07, 1.87, 1.12, 1, 1.32, 1, 1.08, 1.1, 1.04, 1, 1.09, 1.97, 2.97,
-    1.21, 1.61, 5.94, 2.55, 4.48, 1.14, 2.73, 1.34, 1.33, 1.29, 1.25, 5.44,
-    1.77, 2.18, 2.52, 1.28, 22.25, 1.04, 3.57, 6.53, 1.34, 5.75, 1.61, 3.89,
-    1.07, 2.13, 5.05, 1.53, 3.53, 8.31, 2.15, 1.39, 1.23, 1.68, 17.14, 1.23,
-    2.38, 1, 2.02, 19.48, 1.22, 1.42, 6.26, 16.11, 2.05, 3.51, 3.53, 1.83,
-    6.86, 1.24, 27.78, 2.33, 3.43, 2.92, 1.26, 15.11, 24.58, 1.12, 2.46,
-    5.61, 9.79, 2.33, 1.34, 7.86, 1.1, 2.61, 2.34, 4.5, 1.79, 1.75, 18,
-    8.66, 1.92, 11.5, 1.35, 2.53, 1.79, 1.14, 1.58, 1.84, 1.35, 6.44, 4.49,
-    3.02, 3.16, 1.12, 1.42, 9.14, 1.26, 1.19, 2.47, 1.2, 3.88, 1.03, 1.85,
-    1.07, 1.03, 1.13, 4.87, 1.03, 1.8, 1.29, 6.11, 1.73, 30.16, 2.99, 2.34,
-    1.56, 4.33, 1.23, 7.39, 1.57, 3.16, 2.73, 1.46, 1.01, 8.24, 1.61, 2.28,
-    1.91, 1.49, 5.12, 3.53, 20.05, 3.26, 2.25, 6.61, 1.35, 4.32, 1, 2.13,
-    1.83, 1.26, 2.27, 1.21, 1.64, 1.77, 1.06, 1.05, 1.98, 3.1, 3.74, 22.09,
-    2.17, 2.97, 1.26, 1.83, 4.44, 1.08, 2.22, 1.24, 1.7, 20.14, 16.56, 1.72,
-    1.37, 1.06, 1.65, 2.42, 3.84, 1, 1.56, 1.93, 1.03, 1.47, 1.76, 12.64,
-    1.12, 1.32, 1.89, 1.64, 1.2, 3.15, 1.88, 1.12, 1.01, 1.45, 1.71, 1.65,
-    1.65, 5.16, 1.48, 1.73
-]
-
-# ============================================================
-# دوال التحليل
-# ============================================================
-
-@st.cache_data
-def compute_basic_stats(data):
-    arr = np.array(data)
-    return {
-        'n'       : len(arr),
-        'mean'    : float(np.mean(arr)),
-        'median'  : float(np.median(arr)),
-        'std'     : float(np.std(arr)),
-        'min'     : float(np.min(arr)),
-        'max'     : float(np.max(arr)),
-        'q25'     : float(np.percentile(arr, 25)),
-        'q75'     : float(np.percentile(arr, 75)),
-        'skew'    : float(stats.skew(arr)),
-        'kurt'    : float(stats.kurtosis(arr)),
-    }
+import openpyxl
+from openpyxl.styles import PatternFill
 
 
-@st.cache_data
-def run_randomness_tests(data):
-    arr = np.array(data)
-    results = {}
-
-    # ── 1. اختبار الارتباط الذاتي (Lag-1) ──────────────────
-    ac1 = float(np.corrcoef(arr[:-1], arr[1:])[0, 1])
-    results['autocorr'] = {
-        'value'  : round(ac1, 4),
-        'pass'   : abs(ac1) < 0.10,
-        'label'  : 'ارتباط ذاتي Lag-1',
-        'interp' : (
-            f"ارتباط ضعيف جداً ({ac1:.4f}) → لا نمط واضح بين قيمة وما يليها"
-            if abs(ac1) < 0.10 else
-            f"ارتباط ملحوظ ({ac1:.4f}) → يوجد تبعية بين القيم المتتالية"
-        )
-    }
-
-    # ── 2. Runs Test ─────────────────────────────────────────
-    med  = float(np.median(arr))
-    runs_seq = [1 if x > med else 0 for x in arr]
-    n1 = int(sum(runs_seq))
-    n2 = len(runs_seq) - n1
-    r  = int(sum(
-        1 for i in range(1, len(runs_seq))
-        if runs_seq[i] != runs_seq[i-1]
-    ) + 1)
-    exp_r = 2*n1*n2/(n1+n2) + 1 if (n1+n2) > 0 else 1
-    var_r = (
-        2*n1*n2*(2*n1*n2 - n1 - n2) /
-        ((n1+n2)**2 * (n1+n2-1) + 1e-10)
-    )
-    z_runs = (r - exp_r) / (var_r**0.5 + 1e-10)
-    p_runs = float(2 * (1 - stats.norm.cdf(abs(z_runs))))
-    results['runs'] = {
-        'z'      : round(z_runs, 4),
-        'p'      : round(p_runs, 4),
-        'pass'   : p_runs > 0.05,
-        'label'  : 'Runs Test (تسلسل)',
-        'interp' : (
-            f"p={p_runs:.4f} > 0.05 → التسلسل عشوائي"
-            if p_runs > 0.05 else
-            f"p={p_runs:.4f} < 0.05 → التسلسل غير عشوائي"
-        )
-    }
-
-    # ── 3. Kolmogorov-Smirnov مقابل توزيع أسي ───────────────
-    loc_exp = float(np.min(arr))
-    scale_exp = float(np.mean(arr) - loc_exp)
-    ks_stat, ks_p = stats.kstest(
-        arr, 'expon',
-        args=(loc_exp, scale_exp + 1e-10)
-    )
-    results['ks_exp'] = {
-        'stat'   : round(float(ks_stat), 4),
-        'p'      : round(float(ks_p),    4),
-        'pass'   : ks_p > 0.05,
-        'label'  : 'KS - توزيع أسي',
-        'interp' : (
-            f"p={ks_p:.4f} → البيانات تتبع توزيعاً أسياً"
-            if ks_p > 0.05 else
-            f"p={ks_p:.4f} → البيانات لا تتبع التوزيع الأسي بدقة"
-        )
-    }
-
-    # ── 4. اختبار الطبيعي ────────────────────────────────────
-    _, norm_p = stats.normaltest(arr)
-    results['normality'] = {
-        'p'      : round(float(norm_p), 6),
-        'pass'   : norm_p > 0.05,
-        'label'  : 'اختبار الطبيعية',
-        'interp' : (
-            "البيانات طبيعية التوزيع"
-            if norm_p > 0.05 else
-            "البيانات ليست طبيعية (انحراف يميني واضح)"
-        )
-    }
-
-    # ── 5. ارتباطات متعددة Lag 1-5 ──────────────────────────
-    lags = {}
-    for lag in range(1, 6):
-        if len(arr) > lag:
-            c = float(np.corrcoef(arr[:-lag], arr[lag:])[0, 1])
-            lags[lag] = round(c, 4)
-    results['lags'] = lags
-
-    # ── 6. حكم شامل ─────────────────────────────────────────
-    passed = sum([
-        results['autocorr']['pass'],
-        results['runs']['pass'],
-    ])
-    results['verdict'] = {
-        'random'   : passed >= 2,
-        'score'    : passed,
-        'max_score': 2
-    }
-
-    return results
+def resource_path(relative_path):
+    """Return a resource path compatible with PyInstaller and normal Python."""
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(base_path, relative_path)
 
 
-@st.cache_data
-def compute_distribution(data):
-    """توزيع البيانات على حالات"""
-    arr   = np.array(data)
-    total = len(arr)
-    bins  = [
-        (1.0,  2.0,  'منخفض جداً',  '#4a9eff'),
-        (2.0,  5.0,  'منخفض',       '#00d4ff'),
-        (5.0,  10.0, 'متوسط',       '#ffa500'),
-        (10.0, 20.0, 'مرتفع',       '#ff6b6b'),
-        (20.0, 99.0, 'مرتفع جداً',  '#ff0066'),
-    ]
-    result = []
-    for lo, hi, label, color in bins:
-        cnt = int(np.sum((arr >= lo) & (arr < hi)))
-        result.append({
-            'label': label,
-            'range': f"{lo}-{hi}",
-            'count': cnt,
-            'pct'  : round(100 * cnt / total, 2),
-            'color': color,
-        })
-    return result
+def detect_subject_type(text):
+    """Detect the subject family from a sheet/file label."""
+    t = str(text).lower()
+    if any(k.lower() in t for k in ("فرنسية", "Français", "Fr")):
+        return "الفرنسية"
+    if any(k.lower() in t for k in ("انجليزية", "Anglais", "Ang")):
+        return "الانجليزية"
+    if any(k.lower() in t for k in ("بدنية", "رياضة", "Sport", "EPS")):
+        return "الرياضة"
+    return "العربية"
 
 
-@st.cache_data
-def kelly_criterion(data, multiplier_threshold=2.0):
-    """
-    حساب Kelly Criterion لإدارة رأس المال
-    p  = احتمال الفوز (قيمة >= multiplier_threshold)
-    b  = متوسط المضاعف عند الفوز
-    q  = 1 - p
-    f* = (bp - q) / b
-    """
-    arr  = np.array(data)
-    wins = arr[arr >= multiplier_threshold]
-    p    = len(wins) / len(arr)
-    q    = 1 - p
-    b    = float(np.mean(wins)) if len(wins) > 0 else multiplier_threshold
-
-    kelly = (b * p - q) / (b + 1e-10)
-    kelly = max(0.0, min(kelly, 0.5))   # حد أقصى 50% دائماً
-
-    # Half Kelly (أكثر أماناً)
-    half_kelly = kelly / 2
-
-    # احتمال الخراب عند استراتيجيات مختلفة
-    def ruin_prob(f, p, b, n=100):
-        """محاكاة بسيطة لاحتمال الخسارة الكاملة"""
-        trials   = 500
-        bankrupt = 0
-        for _ in range(trials):
-            capital = 1.0
-            for _ in range(n):
-                bet = capital * f
-                if np.random.random() < p:
-                    capital += bet * b
-                else:
-                    capital -= bet
-                if capital <= 0.01:
-                    bankrupt += 1
-                    break
-        return round(bankrupt / trials * 100, 1)
-
-    return {
-        'p'          : round(p,           4),
-        'q'          : round(q,           4),
-        'b'          : round(b,           4),
-        'kelly'      : round(kelly,       4),
-        'half_kelly' : round(half_kelly,  4),
-        'kelly_pct'  : round(kelly*100,   2),
-        'half_pct'   : round(half_kelly*100, 2),
-        'threshold'  : multiplier_threshold,
-        'n_wins'     : len(wins),
-        'n_total'    : len(arr),
-    }
-
-
-@st.cache_data
-def simulate_strategies(data, capital=1000.0, n_sim=200):
-    """
-    محاكاة 3 استراتيجيات رهان على البيانات التاريخية
-    1. ثابت (1% من رأس المال)
-    2. Kelly نصف
-    3. متهور (10%)
-    """
-    arr = np.array(data)
-    threshold = 2.0
-
-    def run_sim(fraction):
-        caps = [capital]
-        cap  = capital
-        for val in arr:
-            bet = max(0.01, cap * fraction)
-            if val >= threshold:
-                cap += bet * (val - 1)
-            else:
-                cap -= bet
-            cap = max(0, cap)
-            caps.append(round(cap, 2))
-        return caps
-
-    kelly_info = kelly_criterion(data, threshold)
-    f_kelly    = kelly_info['half_kelly']
-
-    return {
-        'conservative': run_sim(0.01),
-        'kelly'       : run_sim(f_kelly),
-        'aggressive'  : run_sim(0.10),
-        'f_kelly'     : f_kelly,
-    }
-
-
-def stop_loss_analysis(data, capital=1000.0,
-                        stop_loss_pct=20.0, take_profit_pct=50.0):
-    """تحليل حدود الخسارة والربح"""
-    arr = np.array(data)
-    sl  = capital * (1 - stop_loss_pct  / 100)
-    tp  = capital * (1 + take_profit_pct / 100)
-
-    # محاكاة بسيطة بفرصة ثابتة 1%
-    cap  = capital
-    hits_sl = 0
-    hits_tp = 0
-    neutral = 0
-
-    for val in arr:
-        bet = cap * 0.02
-        if val >= 2.0:
-            cap += bet * (val - 1)
-        else:
-            cap -= bet
-        cap = max(0, cap)
-
-        if cap <= sl:
-            hits_sl += 1
-            cap = capital   # إعادة تعيين
-        elif cap >= tp:
-            hits_tp += 1
-            cap = capital
-
-    total_triggers = hits_sl + hits_tp + neutral
-    return {
-        'sl_level'   : round(sl,       2),
-        'tp_level'   : round(tp,       2),
-        'hits_sl'    : hits_sl,
-        'hits_tp'    : hits_tp,
-        'sl_pct'     : stop_loss_pct,
-        'tp_pct'     : take_profit_pct,
-    }
-
-
-# ============================================================
-# الشريط الجانبي
-# ============================================================
-with st.sidebar:
-    st.markdown(
-        "<h2 style='color:#00d4ff;'>⚙️ الإعدادات</h2>",
-        unsafe_allow_html=True
-    )
-    st.markdown("---")
-
-    # مصدر البيانات
-    src = st.radio(
-        "مصدر البيانات",
-        ["البيانات الافتراضية", "إدخال يدوي"],
-        index=0
-    )
-
-    if src == "إدخال يدوي":
-        raw_txt = st.text_area(
-            "أدخل القيم (مفصولة بفاصلة أو سطر)",
-            height=180,
-            placeholder="1.5, 2.3, 8.7 ..."
-        )
-        import re
-        nums = re.findall(r"[\d.]+", raw_txt)
-        try:
-            user_data = [float(x) for x in nums if float(x) > 0]
-            if len(user_data) < 30:
-                st.warning("يُنصح بـ 30 قيمة على الأقل")
-                user_data = DEFAULT_DATA
-        except Exception:
-            user_data = DEFAULT_DATA
+def open_file(path):
+    """Open a file using the platform's default application."""
+    if sys.platform == "win32":
+        os.startfile(path)
     else:
-        user_data = DEFAULT_DATA
+        subprocess.Popen(["xdg-open", path])
 
-    st.markdown("---")
-    st.markdown(
-        "<h3 style='color:#87ceeb;'>💰 إعدادات رأس المال</h3>",
-        unsafe_allow_html=True
-    )
 
-    capital      = st.number_input(
-        "رأس المال الابتدائي", 100, 1_000_000, 1000, 100
-    )
-    mult_thresh  = st.slider(
-        "عتبة الفوز (المضاعف)", 1.1, 5.0, 2.0, 0.1,
-        help="القيمة الدنيا التي تُعتبر 'فوزاً'"
-    )
-    sl_pct       = st.slider(
-        "حد الخسارة Stop Loss %", 5, 50, 20, 5
-    )
-    tp_pct       = st.slider(
-        "هدف الربح Take Profit %", 10, 200, 50, 10
-    )
+def get_mark_cols(df, header_row):
+    """Return columns considered grade/mark columns, excluding identity/Obs columns."""
+    excluded = frozenset({"", "nan", "nom", "date_n", "matricule", "obs", "prenom"})
+    mark_cols = []
+    for c in range(df.shape[1]):
+        h = str(df.iloc[header_row, c]).strip().lower()
+        if h not in excluded:
+            mark_cols.append(c)
+    return mark_cols
 
-    st.markdown("---")
-    st.markdown(
-        "<h3 style='color:#87ceeb;'>📊 إعدادات العرض</h3>",
-        unsafe_allow_html=True
-    )
-    n_show = st.slider("آخر N قيمة للعرض", 50, 500, 150, 50)
 
-    st.markdown("---")
-    st.markdown("""
-    <div style='color:#4a7a9b; font-size:0.8em; line-height:1.6;'>
-        ⚠️ <strong style='color:#ffa500;'>تحذير قانوني:</strong><br>
-        هذه الأداة للتحليل الإحصائي فقط.<br>
-        لا تضمن أرباحاً ولا تتنبأ بدقة مطلقة.<br>
-        المقامرة تنطوي على مخاطر مالية حقيقية.
-    </div>
-    """, unsafe_allow_html=True)
+def get_obs_col(df, header_row):
+    """Find the Obs column index in a sheet."""
+    for c in range(df.shape[1]):
+        h = str(df.iloc[header_row, c]).strip().lower()
+        if h == "obs":
+            return c
+    return None
 
-# ============================================================
-# تشغيل الحسابات
-# ============================================================
-data         = user_data
-basic        = compute_basic_stats(data)
-rand_tests   = run_randomness_tests(data)
-dist_info    = compute_distribution(data)
-kelly_info   = kelly_criterion(data, mult_thresh)
-sim_data     = simulate_strategies(data, capital)
-sl_info      = stop_loss_analysis(data, capital, sl_pct, tp_pct)
 
-# ============================================================
-# الرأس
-# ============================================================
-st.markdown("""
-<h1 style='text-align:center; color:#00d4ff; margin-bottom:4px;'>
-    📊 المحلل الإحصائي الصادق
-</h1>
-<p style='text-align:center; color:#87ceeb; font-size:1.05em;'>
-    تحليل عشوائية البيانات · إدارة رأس المال · حدود الخسارة والربح
-</p>
-""", unsafe_allow_html=True)
-st.markdown("---")
+class ObservationSettingsDialog(QDialog):
+    def __init__(self, parent=None, current_settings=None):
+        super().__init__(parent)
+        self.setWindowTitle("إعدادات الملاحظات والمجالات")
+        self.resize(860, 620)
+        self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+        self.settings = current_settings or self.get_default_settings()
+        self.tabs = {}
+        self.init_ui()
 
-# ============================================================
-# بطاقات الإحصاءات
-# ============================================================
-c1, c2, c3, c4, c5, c6 = st.columns(6)
-cards = [
-    (c1, len(data),             "عدد القيم",          ""),
-    (c2, f"{basic['mean']:.2f}","المتوسط",            ""),
-    (c3, f"{basic['median']:.2f}","الوسيط",           ""),
-    (c4, f"{basic['std']:.2f}", "الانحراف المعياري",  ""),
-    (c5, f"{basic['max']:.2f}", "أعلى قيمة",          ""),
-    (c6, f"{basic['skew']:.2f}","معامل الانحراف",     ""),
-]
-for col, val, lbl, sub in cards:
-    with col:
-        st.markdown(f"""
-        <div class="card">
-            <div class="card-title">{lbl}</div>
-            <div class="card-value">{val}</div>
-            <div class="card-sub">{sub}</div>
-        </div>""", unsafe_allow_html=True)
+    def get_default_settings(self):
+        ar = [
+            (0, 1.99, "ضعيف جدا"),
+            (2, 3.99, "ضعيف يجب العمل أكثر"),
+            (4, 4.99, "دون الوسط"),
+            (5, 5.99, "فوق المتوسط"),
+            (6, 7.5, "قريب من الجيد"),
+            (7.51, 8.99, "جيد"),
+            (9, 10, "ممتاز"),
+        ]
+        r = {
+            "العربية": list(ar),
+            "الفرنسية": [
+                (0, 1.99, "Très faible"), (2, 3.99, "Faible"),
+                (4, 4.99, "Insuffisant"), (5, 5.99, "Passable"),
+                (6, 7.5, "Assez bien"), (7.51, 8.99, "Bien"),
+                (9, 10, "Excellent"),
+            ],
+            "الانجليزية": [
+                (0, 1.99, "Very weak"), (2, 3.99, "Weak"),
+                (4, 4.99, "Below average"), (5, 5.99, "Above average"),
+                (6, 7.5, "Fairly good"), (7.51, 8.99, "Good"),
+            ],
+            "الرياضة": list(ar),
+        }
+        return r
 
-st.markdown("<br>", unsafe_allow_html=True)
+    def init_ui(self):
+        layout = QVBoxLayout(self)
+        tab_widget = QTabWidget()
+        tabs = ("العربية", "الفرنسية", "الانجليزية", "الرياضة")
 
-# ============================================================
-# التبويبات الرئيسية
-# ============================================================
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
-    "🔬 اختبار العشوائية",
-    "📈 تحليل البيانات",
-    "💰 Kelly & رأس المال",
-    "🛡️ Stop Loss / Take Profit",
-    "📋 التوصيات الشاملة",
-])
+        for sub in tabs:
+            tab = QWidget()
+            tab_layout = QVBoxLayout(tab)
+            tbl = QTableWidget()
+            tbl.setHorizontalHeaderLabels(("من", "إلى", "الملاحظة"))
+            tbl.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+            tbl.setFont(QFont("Arial"))
+            data = self.settings.get(sub, [])
+            tbl.setRowCount(len(data))
+            for r, rule in enumerate(data):
+                sp_min = QDoubleSpinBox()
+                sp_min.setRange(0, 10)
+                sp_min.setSingleStep(0.01)
+                sp_min.setValue(float(rule[0]))
+                sp_max = QDoubleSpinBox()
+                sp_max.setRange(0, 10)
+                sp_max.setSingleStep(0.01)
+                sp_max.setValue(float(rule[1]))
+                tbl.setCellWidget(r, 0, sp_min)
+                tbl.setCellWidget(r, 1, sp_max)
+                tbl.setItem(r, 2, QTableWidgetItem(str(rule[2])))
+            tab_layout.addWidget(tbl)
+            tabs and self.tabs.__setitem__(sub, tbl)
+            tab_widget.addTab(tab, sub)
 
-# ══════════════════════════════════════════════════════════════
-# التبويب 1: اختبار العشوائية
-# ══════════════════════════════════════════════════════════════
-with tab1:
-    st.markdown(
-        "<div class='section-title'>🔬 نتائج اختبارات العشوائية</div>",
-        unsafe_allow_html=True
-    )
+        layout.addWidget(tab_widget)
+        btn_row = QHBoxLayout()
+        b_exp = QPushButton("📤 تصدير القواعد (TXT)")
+        b_exp.setStyleSheet("background-color:#2d3436;color:white;padding:8px;")
+        b_exp.clicked.connect(self.export_settings)
+        b_imp = QPushButton("📥 استيراد القواعد (TXT)")
+        b_imp.setStyleSheet("background-color:#2d3436;color:white;padding:8px;")
+        b_imp.clicked.connect(self.import_settings)
+        b_ok = QPushButton("✅ حفظ الإعدادات")
+        b_ok.setStyleSheet("background-color:#27ae60;color:white;font-weight:bold;padding:8px;")
+        b_ok.clicked.connect(self.accept)
+        btn_row.addWidget(b_exp)
+        btn_row.addWidget(b_imp)
+        btn_row.addStretch()
+        btn_row.addWidget(b_ok)
+        layout.addLayout(btn_row)
 
-    # الحكم الشامل
-    verdict   = rand_tests['verdict']
-    is_random = verdict['random']
-    v_color   = "#ffa500" if is_random else "#00ff88"
-    v_icon    = "⚠️" if is_random else "🔍"
-    v_text    = (
-        "البيانات تبدو عشوائية - لا نمط حتمي قابل للاستغلال"
-        if is_random else
-        "تم اكتشاف انحراف عن العشوائية - يستحق دراسة أعمق"
-    )
+    def get_updated_settings(self):
+        result = {}
+        for sub, tbl in self.tabs.items():
+            rows = []
+            for r in range(tbl.rowCount()):
+                mi = tbl.cellWidget(r, 0).value()
+                ma = tbl.cellWidget(r, 1).value()
+                item = tbl.item(r, 2)
+                tx = item.text() if item else ""
+                rows.append((mi, ma, tx))
+            result[sub] = rows
+        return result
 
-    st.markdown(f"""
-    <div style="background:rgba({
-        '255,165,0' if is_random else '0,255,136'
-    },0.08); border:2px solid {v_color};
-    border-radius:14px; padding:20px; text-align:center; margin-bottom:20px;">
-        <div style="font-size:2em;">{v_icon}</div>
-        <div style="color:{v_color}; font-size:1.3em;
-                    font-weight:bold; margin:8px 0;">
-            {v_text}
-        </div>
-        <div style="color:#87ceeb; font-size:0.9em;">
-            اجتاز {verdict['score']} من {verdict['max_score']} اختبارات العشوائية
-        </div>
-    </div>""", unsafe_allow_html=True)
+    def export_settings(self):
+        p, _ = QFileDialog.getSaveFileName(self, "تصدير", "", "TXT (*.txt)")
+        if not p:
+            return
+        with open(p, "w", encoding="utf-8") as f:
+            json.dump(self.get_updated_settings(), f, ensure_ascii=False, indent=2)
+        QMessageBox.information(self, "تم", "تم تصدير القواعد.")
 
-    # نتائج الاختبارات التفصيلية
-    tests_to_show = ['autocorr', 'runs', 'ks_exp', 'normality']
-    test_cols     = st.columns(2)
+    def import_settings(self):
+        p, _ = QFileDialog.getOpenFileName(self, "استيراد", "", "TXT (*.txt)")
+        if not p:
+            return
+        with open(p, "r", encoding="utf-8") as f:
+            imp = json.load(f)
+        for s, d in imp.items():
+            if s not in self.tabs:
+                continue
+            tbl = self.tabs[s]
+            tbl.setRowCount(len(d))
+            for r, rule in enumerate(d):
+                sp_min = tbl.cellWidget(r, 0)
+                sp_max = tbl.cellWidget(r, 1)
+                if sp_min is None:
+                    sp_min = QDoubleSpinBox(); sp_min.setRange(0, 10); sp_min.setSingleStep(0.01)
+                    tbl.setCellWidget(r, 0, sp_min)
+                if sp_max is None:
+                    sp_max = QDoubleSpinBox(); sp_max.setRange(0, 10); sp_max.setSingleStep(0.01)
+                    tbl.setCellWidget(r, 1, sp_max)
+                sp_min.setValue(float(rule[0]))
+                sp_max.setValue(float(rule[1]))
+                tbl.setItem(r, 2, QTableWidgetItem(str(rule[2])))
+        QMessageBox.information(self, "تم", "تم استيراد القواعد.")
 
-    for i, key in enumerate(tests_to_show):
-        t   = rand_tests[key]
-        col = test_cols[i % 2]
-        with col:
-            passed     = t.get('pass', False)
-            box_class  = "result-pass" if passed else "result-fail"
-            icon       = "✅" if passed else "❌"
 
-            # القيمة الرئيسية للعرض
-            if 'value' in t:
-                main_val = f"{t['value']}"
-            elif 'z' in t:
-                main_val = f"z = {t['z']}, p = {t['p']}"
-            elif 'stat' in t:
-                main_val = f"stat = {t['stat']}, p = {t['p']}"
-            else:
-                main_val = f"p = {t['p']}"
+class BatchErrorReportDialog(QDialog):
+    def __init__(self, parent, html_content, raw_text_for_export):
+        super().__init__(parent)
+        self.setWindowTitle("تقرير فحص الدفعة (أخطاء وحالة الملفات)")
+        self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+        self.resize(800, 600)
+        self.raw_text_for_export = raw_text_for_export
+        vl = QVBoxLayout(self)
+        te = QTextEdit()
+        te.setReadOnly(True)
+        te.setHtml(html_content)
+        vl.addWidget(te)
+        btn_row = QHBoxLayout()
+        b_export = QPushButton("📄 تصدير التقرير المجمع (TXT)")
+        b_export.setStyleSheet("background-color:#2d3436; color:white; padding:10px; font-weight:bold;")
+        b_export.clicked.connect(self.export_report)
+        b_open = QPushButton("✏️  فهمت – أغلق التقرير")
+        b_open.setStyleSheet("background-color:#e74c3c; color:white; padding:10px; font-weight:bold;")
+        b_open.clicked.connect(self.accept)
+        btn_row.addWidget(b_export)
+        btn_row.addStretch()
+        btn_row.addWidget(b_open)
+        vl.addLayout(btn_row)
 
-            st.markdown(f"""
-            <div class="{box_class}">
-                <strong>{icon} {t['label']}</strong><br>
-                <span style="font-size:0.9em; opacity:0.9;">
-                    {main_val}
-                </span><br>
-                <span style="font-size:0.85em; opacity:0.8;
-                             margin-top:4px; display:block;">
-                    {t['interp']}
-                </span>
-            </div>""", unsafe_allow_html=True)
-
-    # رسم الارتباطات الذاتية
-    st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown(
-        "<div class='section-title'>📉 الارتباط الذاتي (Lag 1-5)</div>",
-        unsafe_allow_html=True
-    )
-
-    lags   = rand_tests['lags']
-    lag_x  = list(lags.keys())
-    lag_y  = list(lags.values())
-    colors = ['#00ff88' if abs(v) < 0.10 else '#ff4444' for v in lag_y]
-
-    fig_lag = go.Figure()
-    fig_lag.add_trace(go.Bar(
-        x=[f"Lag {k}" for k in lag_x],
-        y=lag_y,
-        marker_color=colors,
-        text=[f"{v:.4f}" for v in lag_y],
-        textposition='outside'
-    ))
-    fig_lag.add_hline(y=0.10, line_dash='dash',
-                      line_color='#ffa500', opacity=0.7,
-                      annotation_text="حد الأهمية +0.10")
-    fig_lag.add_hline(y=-0.10, line_dash='dash',
-                      line_color='#ffa500', opacity=0.7,
-                      annotation_text="حد الأهمية -0.10")
-    fig_lag.update_layout(
-        title="معاملات الارتباط الذاتي - كلما اقتربت من 0 كلما كانت العشوائية أعلى",
-        yaxis_title="معامل الارتباط",
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(15,25,45,0.8)',
-        font_color='white',
-        height=320,
-    )
-    st.plotly_chart(fig_lag, use_container_width=True)
-
-    # توزيع القيم - هيستوغرام
-    st.markdown(
-        "<div class='section-title'>📊 توزيع القيم</div>",
-        unsafe_allow_html=True
-    )
-    arr_np  = np.array(data)
-    fig_hist = go.Figure()
-    fig_hist.add_trace(go.Histogram(
-        x=arr_np,
-        nbinsx=40,
-        marker_color='#4a9eff',
-        opacity=0.8,
-        name='التوزيع الفعلي'
-    ))
-    # منحنى أسي للمقارنة
-    x_range = np.linspace(float(arr_np.min()),
-                          float(arr_np.max()), 200)
-    loc_e   = float(arr_np.min())
-    scl_e   = float(arr_np.mean()) - loc_e
-    pdf_e   = stats.expon.pdf(x_range, loc=loc_e, scale=scl_e+1e-10)
-    pdf_e   = pdf_e * len(data) * (arr_np.max()-arr_np.min()) / 40
-
-    fig_hist.add_trace(go.Scatter(
-        x=x_range, y=pdf_e,
-        mode='lines', name='توزيع أسي مرجعي',
-        line=dict(color='#ff6b6b', width=2, dash='dash')
-    ))
-    fig_hist.update_layout(
-        title="توزيع القيم مقارنةً بالتوزيع الأسي المرجعي",
-        xaxis_title="القيمة",
-        yaxis_title="التكرار",
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(15,25,45,0.8)',
-        font_color='white',
-        legend=dict(bgcolor='rgba(0,0,0,0.3)'),
-        height=350,
-    )
-    st.plotly_chart(fig_hist, use_container_width=True)
-
-# ══════════════════════════════════════════════════════════════
-# التبويب 2: تحليل البيانات
-# ══════════════════════════════════════════════════════════════
-with tab2:
-    st.markdown(
-        "<div class='section-title'>📈 السلسلة الزمنية</div>",
-        unsafe_allow_html=True
-    )
-
-    data_slice = data[-n_show:]
-    idx_slice  = list(range(len(data) - n_show, len(data)))
-
-    fig_ts = go.Figure()
-    fig_ts.add_trace(go.Scatter(
-        x=idx_slice, y=data_slice,
-        mode='lines',
-        line=dict(color='#4a9eff', width=1),
-        name='القيم', opacity=0.8
-    ))
-
-    # تلوين المناطق
-    for lo, hi, lbl, clr in [
-        (1, 2,  'منخفض جداً', 'rgba(74,158,255,0.08)'),
-        (2, 5,  'منخفض',      'rgba(0,212,255,0.05)'),
-        (5, 10, 'متوسط',      'rgba(255,165,0,0.05)'),
-    ]:
-        fig_ts.add_hrect(
-            y0=lo, y1=hi,
-            fillcolor=clr,
-            line_width=0,
-            annotation_text=lbl,
-            annotation_position="left"
+    def export_report(self):
+        p, _ = QFileDialog.getSaveFileName(
+            self, "حفظ التقرير المجمع", "تقرير_الدفعة.txt", "Text Files (*.txt)"
         )
+        if not p:
+            return
+        try:
+            with open(p, "w", encoding="utf-8") as f:
+                f.write(self.raw_text_for_export)
+            QMessageBox.information(self, "نجاح", "تم تصدير التقرير بنجاح.")
+        except Exception as e:
+            QMessageBox.warning(self, "خطأ", "تعذر حفظ الملف: " + str(e))
 
-    # تمييز القيم العالية
-    hi_idx = [idx_slice[i] for i, v in enumerate(data_slice) if v >= 10]
-    hi_val = [v for v in data_slice if v >= 10]
-    fig_ts.add_trace(go.Scatter(
-        x=hi_idx, y=hi_val,
-        mode='markers',
-        marker=dict(color='#ff6b6b', size=7),
-        name='قيم عالية (≥10)'
-    ))
 
-    fig_ts.add_hline(
-        y=basic['mean'], line_dash='dot',
-        line_color='#ffa500', opacity=0.7,
-        annotation_text=f"المتوسط {basic['mean']:.2f}"
-    )
-    fig_ts.update_layout(
-        title=f"آخر {n_show} قيمة",
-        xaxis_title="الموضع",
-        yaxis_title="القيمة",
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(15,25,45,0.8)',
-        font_color='white',
-        legend=dict(bgcolor='rgba(0,0,0,0.3)'),
-        height=400,
-    )
-    st.plotly_chart(fig_ts, use_container_width=True)
+class ExcelInspectorApp(QMainWindow):
+    HEADER_ROW = 4
+    DATA_ROW = 5
 
-    # توزيع الحالات
-    st.markdown(
-        "<div class='section-title'>🎨 توزيع الحالات</div>",
-        unsafe_allow_html=True
-    )
-    d_col1, d_col2 = st.columns([1, 1])
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("برنامج فحص وتصحيح نقاط الرقمنة الإحترافي (نسخة الدفعات) ✔")
+        self.resize(1400, 900)
+        self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+        self.setAcceptDrops(True)
 
-    with d_col1:
-        labels = [d['label'] for d in dist_info]
-        values = [d['count'] for d in dist_info]
-        colors = [d['color'] for d in dist_info]
+        self.loaded_files = []
+        self.current_file_path = None
+        self.excel_data = {}
+        self.current_sheet = None
+        self.current_subject_type = "العربية"
 
-        fig_pie = go.Figure(go.Pie(
-            labels=labels,
-            values=values,
-            marker=dict(colors=colors),
-            hole=0.45,
-            textinfo='label+percent',
-            textfont=dict(size=12, color='white'),
-        ))
-        fig_pie.update_layout(
-            title="توزيع القيم على الحالات",
-            paper_bgcolor='rgba(0,0,0,0)',
-            font_color='white',
-            legend=dict(bgcolor='rgba(0,0,0,0.3)'),
-            height=360,
-        )
-        st.plotly_chart(fig_pie, use_container_width=True)
+        self.color_empty = QColor("#ff7675")
+        self.color_comma = QColor("#ffeaa7")
+        self.color_range = QColor("#fab1a0")
+        self._loading = False
 
-    with d_col2:
-        st.markdown("<br>", unsafe_allow_html=True)
-        for d in dist_info:
-            bar_w = int(d['pct'] * 2)
-            st.markdown(f"""
-            <div style="margin:10px 0;">
-                <div style="display:flex; justify-content:space-between;
-                            margin-bottom:4px;">
-                    <span style="color:{d['color']};">
-                        {d['label']} ({d['range']}x)
-                    </span>
-                    <span style="color:#00d4ff; font-weight:bold;">
-                        {d['count']} ({d['pct']}%)
-                    </span>
-                </div>
-                <div style="background:#1a3a5c; border-radius:4px; height:10px;">
-                    <div style="background:{d['color']}; width:{min(bar_w,200)}px;
-                                height:10px; border-radius:4px;
-                                max-width:100%;"></div>
-                </div>
-            </div>""", unsafe_allow_html=True)
+        icon_path = resource_path(os.path.join("img", "001.png"))
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
 
-    # المتوسط المتحرك
-    st.markdown(
-        "<div class='section-title'>📉 المتوسط المتحرك</div>",
-        unsafe_allow_html=True
-    )
-    win = st.slider("نافذة المتوسط المتحرك", 5, 50, 20, 5)
-    arr_np = np.array(data)
-    ma     = np.convolve(arr_np, np.ones(win)/win, mode='valid')
-    ma_idx = list(range(win - 1, len(data)))
+        self.obs_settings = ObservationSettingsDialog().get_default_settings()
+        self.init_ui()
 
-    fig_ma = go.Figure()
-    fig_ma.add_trace(go.Scatter(
-        x=list(range(len(data))), y=list(data),
-        mode='lines', opacity=0.3,
-        line=dict(color='#4a9eff', width=1),
-        name='القيم الأصلية'
-    ))
-    fig_ma.add_trace(go.Scatter(
-        x=ma_idx, y=list(ma),
-        mode='lines',
-        line=dict(color='#00ff88', width=2),
-        name=f'MA({win})'
-    ))
-    fig_ma.add_hline(
-        y=float(np.mean(arr_np)), line_dash='dash',
-        line_color='#ffa500', opacity=0.6,
-        annotation_text="المتوسط الكلي"
-    )
-    fig_ma.update_layout(
-        title=f"المتوسط المتحرك (نافذة={win})",
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(15,25,45,0.8)',
-        font_color='white',
-        legend=dict(bgcolor='rgba(0,0,0,0.3)'),
-        height=320,
-    )
-    st.plotly_chart(fig_ma, use_container_width=True)
+    def dragEnterEvent(self, event: QDragEnterEvent):
+        urls = event.mimeData().urls()
+        valid = False
+        for u in urls:
+            local_f = u.toLocalFile()
+            if os.path.isdir(local_f) or local_f.lower().endswith((".xlsx", ".xls")):
+                valid = True
+                break
+        if valid:
+            event.accept()
+        else:
+            event.ignore()
 
-    # جدول الإحصاءات
-    with st.expander("📋 جدول الإحصاءات التفصيلية"):
-        stats_df = pd.DataFrame([
-            {"المقياس": "العدد",               "القيمة": len(data)},
-            {"المقياس": "المتوسط",             "القيمة": round(basic['mean'],   4)},
-            {"المقياس": "الوسيط",              "القيمة": round(basic['median'], 4)},
-            {"المقياس": "الانحراف المعياري",   "القيمة": round(basic['std'],    4)},
-            {"المقياس": "الحد الأدنى",         "القيمة": round(basic['min'],    4)},
-            {"المقياس": "الربيع الأول (Q1)",   "القيمة": round(basic['q25'],   4)},
-            {"المقياس": "الربيع الثالث (Q3)",  "القيمة": round(basic['q75'],   4)},
-            {"المقياس": "الحد الأقصى",         "القيمة": round(basic['max'],    4)},
-            {"المقياس": "معامل الانحراف",      "القيمة": round(basic['skew'],   4)},
-            {"المقياس": "التفرطح (Kurtosis)",  "القيمة": round(basic['kurt'],   4)},
-        ])
-        st.dataframe(stats_df, use_container_width=True, hide_index=True)
+    def dropEvent(self, event: QDropEvent):
+        paths = []
+        for url in event.mimeData().urls():
+            local_path = url.toLocalFile()
+            if os.path.isdir(local_path):
+                for f in os.listdir(local_path):
+                    if f.lower().endswith((".xlsx", ".xls")) and not f.startswith("~$"):
+                        paths.append(os.path.join(local_path, f))
+            elif local_path.lower().endswith((".xlsx", ".xls")):
+                paths.append(local_path)
+        if paths:
+            self.add_files_to_list(paths)
 
-# ══════════════════════════════════════════════════════════════
-# التبويب 3: Kelly & رأس المال
-# ══════════════════════════════════════════════════════════════
-with tab3:
-    st.markdown(
-        "<div class='section-title'>📐 حساب Kelly Criterion</div>",
-        unsafe_allow_html=True
-    )
-
-    k1, k2, k3 = st.columns(3)
-
-    with k1:
-        st.markdown(f"""
-        <div class="kelly-box">
-            <div style="color:#87ceeb; font-size:0.85em;">Kelly الكامل</div>
-            <div class="kelly-value">{kelly_info['kelly_pct']:.1f}%</div>
-            <div style="color:#4a7a9b; font-size:0.8em; margin-top:6px;">
-                من رأس المال لكل رهان
-            </div>
-        </div>""", unsafe_allow_html=True)
-
-    with k2:
-        st.markdown(f"""
-        <div class="kelly-box" style="border-color:#00d4ff;">
-            <div style="color:#87ceeb; font-size:0.85em;">
-                نصف Kelly (الموصى به)
-            </div>
-            <div class="kelly-value" style="color:#00d4ff;">
-                {kelly_info['half_pct']:.1f}%
-            </div>
-            <div style="color:#4a7a9b; font-size:0.8em; margin-top:6px;">
-                أكثر أماناً وعملية
-            </div>
-        </div>""", unsafe_allow_html=True)
-
-    with k3:
-        st.markdown(f"""
-        <div class="kelly-box" style="border-color:#ffa500;">
-            <div style="color:#87ceeb; font-size:0.85em;">
-                احتمال الفوز (≥{mult_thresh}x)
-            </div>
-            <div class="kelly-value" style="color:#ffa500;">
-                {kelly_info['p']*100:.1f}%
-            </div>
-            <div style="color:#4a7a9b; font-size:0.8em; margin-top:6px;">
-                {kelly_info['n_wins']} من {kelly_info['n_total']} قيمة
-            </div>
-        </div>""", unsafe_allow_html=True)
-
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    # شرح Kelly
-    with st.expander("📖 كيف يعمل Kelly Criterion؟"):
-        st.markdown(f"""
-        **معادلة Kelly:**
-        ```
-        f* = (b × p - q) / b
-        ```
-        حيث:
-        - **p** = احتمال الفوز = **{kelly_info['p']:.4f}**
-        - **q** = احتمال الخسارة = **{kelly_info['q']:.4f}**
-        - **b** = متوسط المضاعف عند الفوز = **{kelly_info['b']:.4f}**
-        - **f*** = نسبة رأس المال المُراهن = **{kelly_info['kelly_pct']:.2f}%**
-
-        **لماذا نصف Kelly؟**
-        - Kelly الكامل يعطي أعلى نمو نظرياً
-        - لكنه ينطوي على تذبذب عالٍ جداً
-        - نصف Kelly يقلل التذبذب بـ 50% مع تقليل النمو بـ 25% فقط
+    def init_ui(self):
+        central = QWidget()
+        self.setCentralWidget(central)
+        root = QVBoxLayout(central)
+        root.setSpacing(10)
+        root.setContentsMargins(10, 10, 10, 10)
+        central.setObjectName("central")
+        central.setStyleSheet("""
+            QMainWindow, QWidget#central { background-color: #f8f9fa; }
+            QPushButton { font-size:14px; padding:10px 18px; border-radius:8px; font-weight:bold;
+                          border:none; color:white; }
+            QPushButton:hover { background-color: rgba(0,0,0,0.1); }
+            QPushButton:disabled { background-color:#dcdde1; color:#7f8fa6; }
+            QLabel { font-size:14px; font-weight:bold; color:#2c3e50; }
+            QComboBox { font-size:14px; padding:8px 12px; border:2px solid #3498db;
+                        border-radius:6px; background-color:white; color:#2c3e50; min-width:220px; }
+            QComboBox::drop-down { border:none; }
+            QComboBox QAbstractItemView { background-color:white; selection-background-color:#ecf0f1; color:#2c3e50; }
+            QTableWidget { font-size:14px; gridline-color:#e1e8ed; background-color:white;
+                           border:1px solid #ced4da; border-radius:6px; alternate-background-color:#fbfbfc; }
+            QTableWidget::item:selected { background-color:#3498db; color:white; }
+            QHeaderView::section { background-color:#2c3e50; color:white; font-weight:bold;
+                                   padding:8px; border:1px solid #34495e; }
+            QListWidget { font-size:13px; background-color:white; border:1px solid #ced4da;
+                          border-radius:6px; padding:5px; }
+            QListWidget::item { padding:8px; border-bottom:1px solid #f1f2f6; }
+            QListWidget::item:selected { background-color:#3498db; color:white; border-radius:4px; }
+            QListWidget::item:hover { background-color:#ecf0f1; }
         """)
 
-    # محاكاة الاستراتيجيات
-    st.markdown(
-        "<div class='section-title'>📊 مقارنة الاستراتيجيات</div>",
-        unsafe_allow_html=True
-    )
+        logo_row = QHBoxLayout()
+        logo = QLabel()
+        logo.setText('<span style="font-family: Arial; font-size: 22px; font-weight: bold;">'
+                     '<span style="color:#2980b9;">برنامج </span>'
+                     '<span style="color:#c0392b;">الرقمنة </span>'
+                     '<span style="color:#27ae60;">الإحترافي</span></span>'
+                     '<span style="color:#7f8fa6; font-size:14px;"> '
+                     '(يدعم معالجة الدفعات - اسحب مجلد أو ملفات هنا)</span>')
+        logo_row.addWidget(logo)
+        logo_row.addStretch()
+        root.addLayout(logo_row)
 
-    sim   = sim_data
-    x_sim = list(range(len(sim['conservative'])))
+        bar = QHBoxLayout()
+        btn_add_files = QPushButton("📂  إضافة ملفات / مجلد")
+        btn_add_files.setStyleSheet("background-color:#2980b9; color:white;")
+        btn_add_files.clicked.connect(self.select_files)
+        self.btn_add_files = btn_add_files
+        bar.addWidget(btn_add_files)
 
-    fig_sim = go.Figure()
-    fig_sim.add_trace(go.Scatter(
-        x=x_sim, y=sim['conservative'],
-        mode='lines', name='محافظ (1%)',
-        line=dict(color='#4a9eff', width=1.5)
-    ))
-    fig_sim.add_trace(go.Scatter(
-        x=x_sim, y=sim['kelly'],
-        mode='lines',
-        name=f'نصف Kelly ({sim["f_kelly"]*100:.1f}%)',
-        line=dict(color='#00ff88', width=2)
-    ))
-    fig_sim.add_trace(go.Scatter(
-        x=x_sim, y=sim['aggressive'],
-        mode='lines', name='متهور (10%)',
-        line=dict(color='#ff4444', width=1.5)
-    ))
-    fig_sim.add_hline(
-        y=capital, line_dash='dot',
-        line_color='white', opacity=0.3,
-        annotation_text="رأس المال الأصلي"
-    )
-    fig_sim.update_layout(
-        title="محاكاة رأس المال عبر الزمن - 3 استراتيجيات",
-        xaxis_title="الجولة",
-        yaxis_title="رأس المال",
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(15,25,45,0.8)',
-        font_color='white',
-        legend=dict(bgcolor='rgba(0,0,0,0.3)'),
-        height=420,
-    )
-    st.plotly_chart(fig_sim, use_container_width=True)
+        btn_clear_list = QPushButton("🗑️ تفريغ القائمة")
+        btn_clear_list.setStyleSheet("background-color:#e74c3c; color:white;")
+        btn_clear_list.clicked.connect(self.clear_file_list)
+        self.btn_clear_list = btn_clear_list
+        bar.addWidget(btn_clear_list)
 
-    # نتائج المحاكاة
-    sim_results = st.columns(3)
-    strategies  = [
-        ("محافظ 1%",
-         sim['conservative'],
-         "#4a9eff"),
-        (f"نصف Kelly {sim['f_kelly']*100:.1f}%",
-         sim['kelly'],
-         "#00ff88"),
-        ("متهور 10%",
-         sim['aggressive'],
-         "#ff4444"),
-    ]
-    for col, (name, caps, clr) in zip(sim_results, strategies):
-        final     = caps[-1]
-        change    = (final - capital) / capital * 100
-        min_cap   = min(caps)
-        drawdown  = (min_cap - capital) / capital * 100
-        with col:
-            st.markdown(f"""
-            <div class="card" style="border-color:{clr}40;">
-                <div class="card-title">{name}</div>
-                <div class="card-value" style="color:{clr};">
-                    {final:,.0f}
-                </div>
-                <div class="card-sub">
-                    التغير: {change:+.1f}%<br>
-                    أدنى نقطة: {min_cap:,.0f}
-                    ({drawdown:.1f}%)
-                </div>
-            </div>""", unsafe_allow_html=True)
+        btn_batch_process = QPushButton("🚀 الفحص الشامل للدفعة")
+        btn_batch_process.setStyleSheet("background-color:#8e44ad; color:white;")
+        btn_batch_process.setEnabled(False)
+        btn_batch_process.clicked.connect(self.batch_process_all_files)
+        self.btn_batch_process = btn_batch_process
+        bar.addWidget(btn_batch_process)
 
-# ══════════════════════════════════════════════════════════════
-# التبويب 4: Stop Loss / Take Profit
-# ══════════════════════════════════════════════════════════════
-with tab4:
-    st.markdown(
-        "<div class='section-title'>"
-        "🛡️ تحليل حدود الخسارة والربح"
-        "</div>",
-        unsafe_allow_html=True
-    )
+        btn_autocorrect_batch = QPushButton("✨  تصحيح وإدراج ملاحظات (للقائمة كلها)")
+        btn_autocorrect_batch.setStyleSheet("background-color:#27ae60; color:white;")
+        btn_autocorrect_batch.setEnabled(False)
+        btn_autocorrect_batch.clicked.connect(self.auto_correct_and_insert_batch)
+        self.btn_autocorrect_batch = btn_autocorrect_batch
+        bar.addWidget(btn_autocorrect_batch)
 
-    sl_col1, sl_col2 = st.columns(2)
+        btn_settings = QPushButton("⚙️  إعدادات الملاحظات")
+        btn_settings.setStyleSheet("background-color:#34495e; color:white;")
+        btn_settings.clicked.connect(self.open_settings)
+        self.btn_settings = btn_settings
+        bar.addWidget(btn_settings)
+        root.addLayout(bar)
 
-    with sl_col1:
-        st.markdown(f"""
-        <div class="card">
-            <div class="card-title">🔴 Stop Loss</div>
-            <div class="card-value" style="color:#ff4444;">
-                {sl_info['sl_level']:,.0f}
-            </div>
-            <div class="card-sub">
-                -{sl_pct}% من رأس المال ({capital:,.0f})<br>
-                تفعيل عند الوصول لهذا المستوى
-            </div>
-        </div>""", unsafe_allow_html=True)
+        divider = QLabel(); divider.setFixedHeight(1); divider.setStyleSheet("background:#bdc3c7;")
+        root.addWidget(divider)
 
-    with sl_col2:
-        st.markdown(f"""
-        <div class="card" style="border-color:#00ff88;">
-            <div class="card-title">🟢 Take Profit</div>
-            <div class="card-value" style="color:#00ff88;">
-                {sl_info['tp_level']:,.0f}
-            </div>
-            <div class="card-sub">
-                +{tp_pct}% من رأس المال ({capital:,.0f})<br>
-                جني الأرباح عند هذا المستوى
-            </div>
-        </div>""", unsafe_allow_html=True)
+        body_splitter = QSplitter(Qt.Orientation.Horizontal)
+        list_container = QWidget(); list_layout = QVBoxLayout(list_container)
+        lbl_list = QLabel("📁 قائمة الملفات:"); list_layout.addWidget(lbl_list)
+        self.file_list_widget = QListWidget()
+        self.file_list_widget.itemSelectionChanged.connect(self.on_file_selected_from_list)
+        list_layout.addWidget(self.file_list_widget)
+        body_splitter.addWidget(list_container)
 
-    st.markdown("<br>", unsafe_allow_html=True)
+        table_container = QWidget(); table_layout = QVBoxLayout(table_container)
+        sel = QHBoxLayout()
+        leg = QLabel("نوع الملاحظة:")
+        sel.addWidget(leg)
+        self.combo_obs_type = QComboBox(); self.combo_obs_type.addItems(("العربية", "الفرنسية", "الانجليزية", "الرياضة"))
+        self.combo_obs_type.currentTextChanged.connect(lambda v: setattr(self, "current_subject_type", v))
+        sel.addWidget(self.combo_obs_type)
+        sel.addSpacing(10)
+        txt = QLabel("اللسان (Sheet):"); sel.addWidget(txt)
+        self.combo_sheets = QComboBox(); self.combo_sheets.currentTextChanged.connect(self.on_sheet_changed)
+        sel.addWidget(self.combo_sheets)
+        self.btn_autocorrect_single = QPushButton("✨ تصحيح هدا الملف")
+        self.btn_autocorrect_single.setEnabled(False)
+        self.btn_autocorrect_single.setStyleSheet("background-color:#f39c12; color:white; padding:6px 10px; font-size:12px;")
+        self.btn_autocorrect_single.clicked.connect(self.auto_correct_single)
+        sel.addWidget(self.btn_autocorrect_single)
+        table_layout.addLayout(sel)
 
-    # رسم مناطق الخطر والأمان
-    sl_val = sl_info['sl_level']
-    tp_val = sl_info['tp_level']
+        self.table = QTableWidget()
+        self.table.setAlternatingRowColors(True)
+        self.table.verticalHeader().setDefaultSectionSize(10)
+        self.table.itemChanged.connect(self.on_item_changed)
+        table_layout.addWidget(self.table)
+        body_splitter.addWidget(table_container)
+        body_splitter.setSizes([300, 900])
+        root.addWidget(body_splitter)
 
-    fig_zones = go.Figure()
+        info_lb = QLabel("💡 لتصحيح النقطة، اضغط مرتين وعدلها هنا.")
+        info_lb.setStyleSheet("color:#2980b9; font-size:11px; font-weight:bold;")
+        root.addWidget(info_lb)
+        status_row = QHBoxLayout()
+        self.lbl_status = QLabel("جاهز. اسحب مجموعة ملفات أو مجلد إلى النافذة لبدء العمل.")
+        self.lbl_status.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lbl_status.setStyleSheet("color:#2c3e50; font-size:14px; font-weight:bold;background:#ecf0f1; border:1px solid #bdc3c7; border-radius:6px; padding:10px 12px;")
+        status_row.addWidget(self.lbl_status)
+        root.addLayout(status_row)
 
-    # منطقة الخطر
-    fig_zones.add_hrect(
-        y0=0, y1=sl_val,
-        fillcolor='rgba(255,68,68,0.08)',
-        line_width=0,
-        annotation_text="🔴 منطقة الخطر",
-        annotation_position="left"
-    )
-    # منطقة الأمان
-    fig_zones.add_hrect(
-        y0=sl_val, y1=tp_val,
-        fillcolor='rgba(74,158,255,0.05)',
-        line_width=0,
-        annotation_text="🔵 منطقة الأمان",
-        annotation_position="left"
-    )
-    # منطقة الربح
-    fig_zones.add_hrect(
-        y0=tp_val, y1=tp_val * 2,
-        fillcolor='rgba(0,255,136,0.05)',
-        line_width=0,
-        annotation_text="🟢 منطقة الربح",
-        annotation_position="left"
-    )
+        signature = QLabel('<span style="font-family: Georgia, serif; font-size:18px; font-weight:bold; letter-spacing:2px;">'
+                           '<span style="color:#7d3c98;">By: </span><span style="color:#e67e22;">B</span>'
+                           '<span style="color:#9b59b6;">@</span><span style="color:#e67e22;">k</span>'
+                           '<span style="color:#9b59b6;">h</span><span style="color:#e67e22;">o</span>'
+                           '<span style="color:#9b59b6;">u</span><span style="color:#e67e22;">c</span>'
+                           '<span style="color:#9b59b6;">h</span><span style="color:#e67e22;">e</span></span>')
+        signature.setStyleSheet("background:#ecf0f1; border:1px solid #bdc3c7; border-radius:6px; padding:5px 15px;")
+        signature.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        root.addWidget(signature)
 
-    # محاكاة رأس المال
-    cap_trace = []
-    cap_run   = float(capital)
-    for val in data[-200:]:
-        bet = cap_run * kelly_info['half_kelly']
-        if val >= mult_thresh:
-            cap_run += bet * (val - 1)
+    def select_files(self):
+        paths, _ = QFileDialog.getOpenFileNames(self, "اختر ملفات الإكسال", "", "Excel (*.xlsx *.xls)")
+        if paths:
+            self.add_files_to_list(paths)
+
+    def add_files_to_list(self, file_paths):
+        added = 0
+        for p in file_paths:
+            if p in self.loaded_files or not os.path.isfile(p):
+                continue
+            self.loaded_files.append(p)
+            name = os.path.basename(p)
+            item = QListWidgetItem("📄 " + name)
+            item.setToolTip(p)
+            item.setData(Qt.ItemDataRole.UserRole, p)
+            self.file_list_widget.addItem(item)
+            added += 1
+        self.btn_batch_process.setEnabled(bool(self.loaded_files))
+        self.btn_autocorrect_batch.setEnabled(bool(self.loaded_files))
+        self.lbl_status.setText(f"تم إضافة {added} ملف جديد لقائمة الانتظار. الإجمالي: {len(self.loaded_files)} ملف.")
+
+    def clear_file_list(self):
+        self.loaded_files.clear()
+        self.file_list_widget.clear()
+        self.table.setRowCount(0); self.table.setColumnCount(0)
+        self.combo_sheets.clear()
+        self.current_file_path = None
+        self.btn_batch_process.setEnabled(False)
+        self.btn_autocorrect_batch.setEnabled(False)
+        self.btn_autocorrect_single.setEnabled(False)
+        self.lbl_status.setText("تم تفريغ القائمة.")
+
+    def on_file_selected_from_list(self):
+        selected_items = self.file_list_widget.selectedItems()
+        if not selected_items:
+            return
+        item = selected_items[0]
+        path = item.data(Qt.ItemDataRole.UserRole)
+        self.current_file_path = path
+        self.load_file_into_view(path)
+
+    def load_file_into_view(self, path):
+        try:
+            xl = pd.ExcelFile(path)
+            valid_sheets = []
+            self.excel_data = {}
+            for s in xl.sheet_names:
+                df = xl.parse(s, header=None)
+                self.excel_data[s] = df
+                if df.shape[0] > self.DATA_ROW:
+                    valid_sheets.append(s)
+                errs = self.get_file_errors({s: df})
+                has_errors = any(len(v) for v in errs.values())
+                if has_errors:
+                    self._update_list_item_icon(path, "⚠️ أخطاء", QColor("#e67e22"))
+                else:
+                    self._update_list_item_icon(path, "✅ سليم", QColor("#27ae60"))
+            self.combo_sheets.blockSignals(True)
+            self.combo_sheets.clear(); self.combo_sheets.addItems(valid_sheets)
+            self.combo_sheets.blockSignals(False)
+            self.btn_autocorrect_single.setEnabled(bool(valid_sheets))
+            if valid_sheets:
+                self.load_sheet(valid_sheets[0])
+        except Exception as e:
+            QMessageBox.critical(self, "خطأ", "تعذر قراءة الملف " + os.path.basename(path) + ": " + str(e))
+
+    def _update_list_item_icon(self, filepath, text_prefix, color):
+        for i in range(self.file_list_widget.count()):
+            item = self.file_list_widget.item(i)
+            p = item.data(Qt.ItemDataRole.UserRole)
+            if p == filepath:
+                name = os.path.basename(filepath)
+                item.setText(text_prefix + " | " + name)
+                item.setForeground(color)
+                return
+
+    def get_file_errors(self, excel_data_dict):
+        report = {}
+        for sname, df in excel_data_dict.items():
+            mark_cols = get_mark_cols(df, self.HEADER_ROW)
+            errs = []
+            for r in range(self.DATA_ROW, df.shape[0]):
+                for c in mark_cols:
+                    raw = df.iloc[r, c]
+                    if pd.notna(raw):
+                        cell_val = str(raw).strip()
+                    else:
+                        cell_val = ""
+                    col_lbl = str(df.iloc[self.HEADER_ROW, c]).strip()
+                    if cell_val == "":
+                        errs.append(f"السطر {r+1} | عمود {col_lbl}: خانة فارغة")
+                        continue
+                    if "," in cell_val:
+                        errs.append(f"السطر {r+1} | عمود {col_lbl}: فاصلة خاطئة → '{cell_val}'")
+                        continue
+                    try:
+                        v = float(cell_val)
+                        if v < 0 or v > 10:
+                            errs.append(f"السطر {r+1} | عمود {col_lbl}: قيمة خارج النطاق → {cell_val}")
+                    except ValueError:
+                        errs.append(f"السطر {r+1} | عمود {col_lbl}: غير رقمي → '{cell_val}'")
+            report[sname] = errs
+        return report
+
+    def auto_correct_single(self):
+        if not self.current_file_path:
+            return
+        corrections = self._perform_file_auto_correct(self.current_file_path, self.excel_data)
+        if corrections:
+            self.load_file_into_view(self.current_file_path)
+            QMessageBox.information(self, "التصحيح التلقائي", f"تم تصحيح {corrections} خطأ في هذا الملف.")
         else:
-            cap_run -= bet
-        cap_run = max(0, cap_run)
-        cap_trace.append(round(cap_run, 2))
+            QMessageBox.information(self, "تصحيح", "لم يتم العثور على أخطاء قابلة للتصحيح التلقائي في هذا الملف.")
 
-    fig_zones.add_trace(go.Scatter(
-        x=list(range(len(cap_trace))),
-        y=cap_trace,
-        mode='lines',
-        name='رأس المال',
-        line=dict(color='#00d4ff', width=2)
-    ))
-    fig_zones.add_hline(
-        y=sl_val, line_dash='dash',
-        line_color='#ff4444', line_width=2,
-        annotation_text=f"Stop Loss: {sl_val:,.0f}"
-    )
-    fig_zones.add_hline(
-        y=float(capital), line_dash='dot',
-        line_color='white', opacity=0.4,
-        annotation_text=f"البداية: {capital:,.0f}"
-    )
-    fig_zones.add_hline(
-        y=tp_val, line_dash='dash',
-        line_color='#00ff88', line_width=2,
-        annotation_text=f"Take Profit: {tp_val:,.0f}"
-    )
-    fig_zones.update_layout(
-        title="محاكاة رأس المال مع مناطق Stop Loss / Take Profit",
-        xaxis_title="الجولة",
-        yaxis_title="رأس المال",
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(15,25,45,0.8)',
-        font_color='white',
-        legend=dict(bgcolor='rgba(0,0,0,0.3)'),
-        height=420,
-    )
-    st.plotly_chart(fig_zones, use_container_width=True)
+    def _perform_file_auto_correct(self, path, data_dict):
+        wb = openpyxl.load_workbook(path)
+        fill_clear = PatternFill(fill_type=None)
+        corrections = 0
+        for sname in wb.sheetnames:
+            ws = wb[sname]
+            df = data_dict.get(sname)
+            if df is None or df.shape[0] <= self.DATA_ROW:
+                continue
+            mark_cols = get_mark_cols(df, self.HEADER_ROW)
+            for r in range(self.DATA_ROW, df.shape[0]):
+                for c in mark_cols:
+                    raw_val = ws.cell(row=r + 1, column=c + 1).value
+                    if raw_val is None:
+                        continue
+                    raw_val = str(raw_val).strip()
+                    corrected = raw_val.replace(",", ".")
+                    if corrected != raw_val:
+                        ws.cell(row=r + 1, column=c + 1).value = corrected
+                        ws.cell(row=r + 1, column=c + 1).fill = fill_clear
+                        corrections += 1
+                    elif raw_val and not raw_val.isdigit():
+                        try:
+                            value = float(raw_val)
+                            if 0 <= value <= 10:
+                                ws.cell(row=r + 1, column=c + 1).fill = fill_clear
+                        except ValueError:
+                            pass
+        try:
+            wb.save(path)
+        except PermissionError:
+            return 0
+        return corrections
 
-    # إرشادات Stop Loss
-    st.markdown(
-        "<div class='section-title'>📚 إرشادات إدارة رأس المال</div>",
-        unsafe_allow_html=True
-    )
-    guidelines = [
-        ("🔴 Stop Loss إلزامي",
-         f"أوقف اللعب فوراً عند خسارة {sl_pct}% "
-         f"({sl_val:,.0f}). لا استثناءات.",
-         "rec-danger"),
-        ("🟢 Take Profit منضبط",
-         f"اسحب الأرباح أو توقف عند تحقيق {tp_pct}% "
-         f"ربح ({tp_val:,.0f}). لا تنتظر أكثر.",
-         "rec-warn"),
-        ("💰 حجم الرهان الثابت",
-         f"لا تتجاوز {kelly_info['half_pct']:.1f}% من رأس المال "
-         f"لكل جولة (نصف Kelly).",
-         "rec-strong"),
-        ("⏰ حدود زمنية",
-         "حدد عدداً أقصى من الجولات قبل البدء والتزم به.",
-         "rec-warn"),
-        ("🧠 القرار البارد",
-         "لا تزد رهانك بعد الخسارة. الخسارة السابقة "
-         "لا تغير احتمالات المستقبل.",
-         "rec-danger"),
-    ]
-    for title, body, cls in guidelines:
-        st.markdown(f"""
-        <div class="{cls}">
-            <strong>{title}</strong><br>
-            <span style="font-size:0.9em; opacity:0.9;">{body}</span>
-        </div>""", unsafe_allow_html=True)
+    def batch_process_all_files(self):
+        self.lbl_status.setText("جارٍ فحص الملفات المحددة...")
+        QApplication.processEvents()
+        html_lines = ["<h2 style='color:#8e44ad;'>تقرير فحص الدفعة</h2>"]
+        text_lines = ["━━ تقرير فحص جميع الملفات ━━\n"]
+        total_files = len(self.loaded_files)
+        clean_files = 0
+        error_files = 0
+        for path in self.loaded_files:
+            fname = os.path.basename(path)
+            html_lines.append("<hr><h3 style='color:#34495e;'>ملف: " + fname + "</h3>")
+            text_lines.append("====================\nالملف: " + fname + "\n")
+            try:
+                xl = pd.ExcelFile(path)
+                data_dict = {}
+                file_total_errors = 0
+                for s in xl.sheet_names:
+                    df = xl.parse(s, header=None)
+                    data_dict[s] = df
+                    if df.shape[0] <= self.DATA_ROW:
+                        continue
+                    errs = self.get_file_errors({s: df}).get(s, [])
+                    sheet_errs = errs
+                    file_total_errors += len(sheet_errs)
+                    if sheet_errs:
+                        html_lines.append(f"<b>اللسان ({s}):</b><ul>" + "".join(f"<li style='color:red;'>{e}</li>" for e in sheet_errs) + "</ul>")
+                        text_lines.append(f"  [{s}] " + "\n  ".join(sheet_errs) + "\n")
+                if file_total_errors == 0:
+                    clean_files += 1
+                    self._update_list_item_icon(path, "✅ سليم", QColor("#27ae60"))
+                    html_lines.append("<span style='color:green;'>✅ سليم تماماً وبدون أخطاء.</span>")
+                    text_lines.append("- سليم تماماً وبدون أخطاء.\n")
+                else:
+                    error_files += 1
+                    self._update_list_item_icon(path, "⚠️ أخطاء", QColor("#e67e22"))
+                    html_lines.insert(-1 if html_lines else len(html_lines), f"<span style='color:#e67e22;'>⚠️ عدد الأخطاء: {file_total_errors}</span>")
+                    text_lines.append(f"عدد الأخطاء: {file_total_errors}\n")
+            except Exception as e:
+                error_files += 1
+                html_lines.append("<span style='color:red;'>تعذر المعالجة: " + str(e) + "</span>")
+                text_lines.append("- تعذر المعالجة: " + str(e) + "\n")
+        html_lines.append(f"<h4>تم فحص {total_files} ملفات: <span style='color:green;'>{clean_files} صالحة</span>، <span style='color:red;'>{error_files} بها أخطاء</span>.</h4>")
+        text_lines.append(f"فحص شامل مكتمل. {clean_files} ملف سليم | {error_files} ملف به أخطاء.")
+        self.lbl_status.setText(f"فحص شامل مكتمل. {clean_files} ملف سليم | {error_files} ملف به أخطاء.")
+        dlg = BatchErrorReportDialog(self, "\n".join(html_lines), "\n".join(text_lines))
+        dlg.exec()
 
-# ══════════════════════════════════════════════════════════════
-# التبويب 5: التوصيات الشاملة
-# ══════════════════════════════════════════════════════════════
-with tab5:
-    st.markdown(
-        "<div class='section-title'>📋 لوحة التوصيات الشاملة</div>",
-        unsafe_allow_html=True
-    )
-
-    # ملخص الوضع
-    is_rand    = rand_tests['verdict']['random']
-    k_pct      = kelly_info['half_pct']
-    win_rate   = kelly_info['p'] * 100
-    avg_win    = kelly_info['b']
-
-    # مؤشر الجودة الإجمالية
-    quality_score = 0
-    if win_rate >= 30:
-        quality_score += 25
-    if avg_win >= 2.5:
-        quality_score += 25
-    if k_pct >= 2:
-        quality_score += 25
-    if not is_rand:
-        quality_score += 25
-
-    q_color = (
-        "#00ff88" if quality_score >= 75 else
-        "#ffa500" if quality_score >= 50 else
-        "#ff4444"
-    )
-    q_label = (
-        "ظروف جيدة نسبياً" if quality_score >= 75 else
-        "ظروف متوسطة"      if quality_score >= 50 else
-        "ظروف صعبة"
-    )
-
-    # مؤشر Gauge
-    fig_gauge = go.Figure(go.Indicator(
-        mode  = "gauge+number+delta",
-        value = quality_score,
-        title = {'text': "مؤشر جودة الظروف",
-                 'font': {'color': 'white', 'size': 16}},
-        number= {'suffix': "/100",
-                 'font': {'color': q_color, 'size': 32}},
-        gauge = {
-            'axis' : {'range': [0, 100], 'tickcolor': 'gray'},
-            'bar'  : {'color': q_color},
-            'steps': [
-                {'range': [0,  50], 'color': 'rgba(255,68,68,0.15)'},
-                {'range': [50, 75], 'color': 'rgba(255,165,0,0.15)'},
-                {'range': [75,100], 'color': 'rgba(0,255,136,0.15)'},
-            ],
-            'bgcolor': 'rgba(0,0,0,0)'
-        }
-    ))
-    fig_gauge.update_layout(
-        height=260,
-        margin=dict(t=60, b=10, l=30, r=30),
-        paper_bgcolor='rgba(0,0,0,0)',
-        font_color='white'
-    )
-
-    g_col, s_col = st.columns([1, 1])
-
-    with g_col:
-        st.plotly_chart(fig_gauge, use_container_width=True)
-        st.markdown(
-            f"<div style='text-align:center; color:{q_color}; "
-            f"font-size:1.2em; font-weight:bold;'>{q_label}</div>",
-            unsafe_allow_html=True
+    def auto_correct_and_insert_batch(self):
+        rep = QMessageBox.question(
+            self, "تأكيد العملية الجماعية",
+            "سوف يقوم البرنامج بالمرور على جميع الملفات الموجودة (" + str(len(self.loaded_files)) +
+            " ملف).\n\n1. استبدال جميع الفواصل الخاطئة بنقاط.\n2. إدراج الملاحظات (التقديرات) آلياً.\n3. تخطي الملفات المفتوحة مسبقاً، وتجاهل الخانات المتبقية الفارغة أو الأرقام الكبيرة.\n\nهل متأكد من الاستمرار؟",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
-
-    with s_col:
-        summary_items = [
-            ("احتمال الفوز (≥{:.1f}x)".format(mult_thresh),
-             f"{win_rate:.1f}%",
-             "#ffa500"),
-            ("متوسط المضاعف عند الفوز",
-             f"{avg_win:.2f}x",
-             "#00d4ff"),
-            ("نصف Kelly الموصى به",
-             f"{k_pct:.2f}%",
-             "#00ff88"),
-            ("البيانات عشوائية؟",
-             "نعم ⚠️" if is_rand else "غير مؤكد 🔍",
-             "#ffa500" if is_rand else "#ff6b6b"),
-            ("Stop Loss عند",
-             f"{sl_info['sl_level']:,.0f} (-{sl_pct}%)",
-             "#ff4444"),
-            ("Take Profit عند",
-             f"{sl_info['tp_level']:,.0f} (+{tp_pct}%)",
-             "#00ff88"),
-        ]
-        st.markdown("<br>", unsafe_allow_html=True)
-        for label, value, color in summary_items:
-            st.markdown(f"""
-            <div style="display:flex; justify-content:space-between;
-                        padding:8px 4px;
-                        border-bottom:1px solid #1a3a5c;">
-                <span style="color:#87ceeb;">{label}</span>
-                <span style="color:{color}; font-weight:bold;">
-                    {value}
-                </span>
-            </div>""", unsafe_allow_html=True)
-
-    # التوصيات التفصيلية
-    st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown(
-        "<div class='section-title'>🎯 التوصيات التفصيلية</div>",
-        unsafe_allow_html=True
-    )
-
-    recs = []
-
-    # توصية 1: حجم الرهان
-    if k_pct < 1:
-        recs.append((
-            "rec-danger",
-            "⛔ لا يُنصح بالمشاركة",
-            f"Kelly يعطي {k_pct:.2f}% فقط مما يعني أن الأفضلية "
-            "ليست في صالحك. المشاركة بأي مبلغ ليست مُجدية إحصائياً."
-        ))
-    elif k_pct < 3:
-        recs.append((
-            "rec-warn",
-            "⚠️ رهانات صغيرة جداً فقط",
-            f"Kelly = {k_pct:.2f}% → ارهن بـ {k_pct:.1f}% من رأس المال "
-            f"كحد أقصى ({capital * k_pct/100:,.0f} لكل جولة)."
-        ))
-    else:
-        recs.append((
-            "rec-strong",
-            "✅ حجم رهان معقول",
-            f"Kelly = {k_pct:.2f}% → ارهن بـ {k_pct:.1f}% "
-            f"({capital * k_pct/100:,.0f} لكل جولة). لا تتجاوز هذا."
-        ))
-
-    # توصية 2: احتمال الفوز
-    if win_rate < 20:
-        recs.append((
-            "rec-danger",
-            "🔴 احتمال فوز منخفض جداً",
-            f"فقط {win_rate:.1f}% من القيم تتجاوز {mult_thresh}x. "
-            "هذا يعني خسارة في 4 من كل 5 جولات تقريباً."
-        ))
-    elif win_rate < 35:
-        recs.append((
-            "rec-warn",
-            "🟡 احتمال فوز متوسط",
-            f"{win_rate:.1f}% من القيم تتجاوز {mult_thresh}x. "
-            "المفتاح هو ضبط حجم الرهان بدقة."
-        ))
-    else:
-        recs.append((
-            "rec-strong",
-            "🟢 احتمال فوز معقول",
-            f"{win_rate:.1f}% من القيم تتجاوز {mult_thresh}x. "
-            "لكن تذكر: الماضي لا يضمن المستقبل."
-        ))
-
-    # توصية 3: العشوائية
-    if is_rand:
-        recs.append((
-            "rec-warn",
-            "⚠️ البيانات تبدو عشوائية",
-            "اجتازت البيانات اختبارات العشوائية. هذا يعني أن "
-            "أي نمط تراه قد يكون وهماً إحصائياً (Pareidolia). "
-            "لا تعتمد على أنماط بصرية."
-        ))
-    else:
-        recs.append((
-            "rec-warn",
-            "🔍 تم رصد انحراف عن العشوائية",
-            "بعض الاختبارات أظهرت انحرافاً. لكن هذا لا يعني "
-            "إمكانية التنبؤ المضمون. يحتاج دراسة أعمق بمزيد من البيانات."
-        ))
-
-    # توصية 4: إدارة رأس المال
-    recs.append((
-        "rec-strong",
-        "💡 القاعدة الذهبية لإدارة رأس المال",
-        f"Stop Loss عند {sl_info['sl_level']:,.0f} (-{sl_pct}%) | "
-        f"Take Profit عند {sl_info['tp_level']:,.0f} (+{tp_pct}%) | "
-        f"لا تتجاوز {k_pct:.1f}% لكل رهان. هذه الثلاثة معاً هي درعك الواقي."
-    ))
-
-    # توصية 5: تحذير نهائي
-    recs.append((
-        "rec-danger",
-        "🚨 تحذير: مغالطة القمار",
-        "الخسارة المتتالية لا تعني أن الفوز 'واجب' قادماً. "
-        "كل جولة مستقلة إحصائياً. لا تزد رهانك بعد الخسارة أبداً. "
-        "هذا هو أكثر الأخطاء تدميراً."
-    ))
-
-    for cls, title, body in recs:
-        st.markdown(f"""
-        <div class="{cls}" style="margin:10px 0;">
-            <strong style="font-size:1.05em;">{title}</strong><br>
-            <span style="font-size:0.92em; opacity:0.9;
-                         line-height:1.5;">{body}</span>
-        </div>""", unsafe_allow_html=True)
-
-    # حاسبة رأس المال التفاعلية
-    st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown(
-        "<div class='section-title'>🧮 حاسبة الرهان التفاعلية</div>",
-        unsafe_allow_html=True
-    )
-
-    calc_col1, calc_col2 = st.columns(2)
-    with calc_col1:
-        my_capital = st.number_input(
-            "رأس مالي الحالي", 10, 1_000_000,
-            int(capital), 10
+        if rep != QMessageBox.StandardButton.Yes:
+            return
+        self.lbl_status.setText("جاري معالجة الدفعة... استرخ، قد يستغرق الأمر بعض الثواني.")
+        QApplication.processEvents()
+        success_count = 0
+        skip_count = 0
+        for path in self.loaded_files:
+            try:
+                xl = pd.ExcelFile(path)
+                data_dict = {s: xl.parse(s, header=None) for s in xl.sheet_names}
+                self._perform_file_auto_correct(path, data_dict)
+                xl_new = pd.ExcelFile(path)
+                data_dict_new = {s: xl_new.parse(s, header=None) for s in xl_new.sheet_names}
+                self._insert_obs_for_single_file(path, data_dict_new)
+                self._update_list_item_icon(path, "✅ مُعالج", QColor("#27ae60"))
+                success_count += 1
+            except PermissionError:
+                self._update_list_item_icon(path, "🔒 مفتوح (تم تخطيه)", QColor("red"))
+                skip_count += 1
+            except Exception:
+                self._update_list_item_icon(path, "❌ خطأ غير متوقع", QColor("red"))
+                skip_count += 1
+        QMessageBox.information(
+            self, "اكتملت العملية الجماعية",
+            "تم الانتهاء من المعالجة الجماعية!\n\n✅ تم تصحيح الملاحظات وحفظها في: " + str(success_count) +
+            " ملفات.\n⚠️ تم تخطي الملفات (بسبب الإغلاق أو مشاكل): " + str(skip_count) + " ملفات."
         )
-        my_strategy = st.selectbox(
-            "الاستراتيجية",
-            ["محافظ (0.5%)", "نصف Kelly", "كامل Kelly", "مخصص"]
-        )
-        if my_strategy == "مخصص":
-            custom_pct = st.slider("نسبة مخصصة %", 0.1, 25.0, 2.0, 0.1)
-        else:
-            custom_pct = None
+        self.lbl_status.setText("انتهت عملية تصحيح الدفعة.")
 
-    with calc_col2:
-        if my_strategy == "محافظ (0.5%)":
-            bet_pct = 0.5
-        elif my_strategy == "نصف Kelly":
-            bet_pct = kelly_info['half_pct']
-        elif my_strategy == "كامل Kelly":
-            bet_pct = kelly_info['kelly_pct']
-        else:
-            bet_pct = custom_pct or 2.0
+    def on_sheet_changed(self, name):
+        if name:
+            self.load_sheet(name)
 
-        bet_amount = my_capital * bet_pct / 100
-        sl_amount  = my_capital * sl_pct  / 100
-        tp_amount  = my_capital * tp_pct  / 100
+    def load_sheet(self, name):
+        self.current_sheet = name
+        df = self.excel_data[name]
+        subj_txt = str(name)
+        det = detect_subject_type(subj_txt)
+        self.combo_obs_type.blockSignals(True)
+        self.combo_obs_type.setCurrentText(det)
+        self.combo_obs_type.blockSignals(False)
+        self.current_subject_type = det
+        self._loading = True
+        self.table.setRowCount(max(0, df.shape[0] - self.DATA_ROW))
+        self.table.setColumnCount(df.shape[1])
+        header_labels = [str(df.iloc[self.HEADER_ROW, i]) for i in range(df.shape[1])]
+        self.table.setHorizontalHeaderLabels(header_labels)
+        mark_cols = get_mark_cols(df, self.HEADER_ROW)
+        for r in range(self.DATA_ROW, df.shape[0]):
+            for c in range(df.shape[1]):
+                raw = df.iloc[r, c]
+                text = "" if pd.isna(raw) else str(raw).strip()
+                it = QTableWidgetItem(text)
+                if c in mark_cols:
+                    it.setFlags(it.flags() | Qt.ItemFlag.ItemIsEditable)
+                    it.setBackground(self._err_color(text))
+                else:
+                    it.setFlags(it.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                it.setFont(QFont("Arial", 10, QFont.Weight.Bold if c == 0 else QFont.Weight.Normal))
+                self.table.setItem(r - self.DATA_ROW, c, it)
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self._loading = False
 
-        st.markdown(f"""
-        <div class="card" style="margin-top:10px;">
-            <div class="card-title">نتائج الحاسبة</div>
-            <br>
-            <div style="display:flex; justify-content:space-between;
-                        padding:6px 0; border-bottom:1px solid #1a3a5c;">
-                <span style="color:#87ceeb;">مبلغ الرهان</span>
-                <span style="color:#00ff88; font-weight:bold;">
-                    {bet_amount:,.2f} ({bet_pct:.2f}%)
-                </span>
-            </div>
-            <div style="display:flex; justify-content:space-between;
-                        padding:6px 0; border-bottom:1px solid #1a3a5c;">
-                <span style="color:#87ceeb;">حد الخسارة</span>
-                <span style="color:#ff4444; font-weight:bold;">
-                    -{sl_amount:,.2f}
-                </span>
-            </div>
-            <div style="display:flex; justify-content:space-between;
-                        padding:6px 0; border-bottom:1px solid #1a3a5c;">
-                <span style="color:#87ceeb;">هدف الربح</span>
-                <span style="color:#00ff88; font-weight:bold;">
-                    +{tp_amount:,.2f}
-                </span>
-            </div>
-            <div style="display:flex; justify-content:space-between;
-                        padding:6px 0;">
-                <span style="color:#87ceeb;">عدد الرهانات حتى Stop Loss</span>
-                <span style="color:#ffa500; font-weight:bold;">
-                    ~{int(sl_amount / (bet_amount + 0.01))} جولة
-                </span>
-            </div>
-        </div>""", unsafe_allow_html=True)
+    def on_item_changed(self, item):
+        if self._loading or not self.current_file_path or not self.current_sheet:
+            return
+        try:
+            df = self.excel_data.get(self.current_sheet)
+            c = item.column()
+            r_table = item.row()
+            r_df = r_table + self.DATA_ROW
+            mark_cols = get_mark_cols(df, self.HEADER_ROW)
+            if c not in mark_cols:
+                return
+            val = item.text().strip()
+            new_color = self._err_color(val)
+            item.setBackground(new_color)
+            wb = openpyxl.load_workbook(self.current_file_path)
+            ws = wb[self.current_sheet]
+            cell = ws.cell(row=r_df + 1, column=c + 1)
+            cell.value = val.replace(",", ".") if val else ""
+            color_hex = new_color.name() if new_color.isValid() else "white"
+            if color_hex != "#ffffff":
+                cell.fill = PatternFill(fill_type="solid", fgColor=color_hex.lstrip("#").upper())
+            else:
+                cell.fill = PatternFill(fill_type=None)
+            wb.save(self.current_file_path)
+            errs = self.get_file_errors(self.excel_data)
+            has_errors = any(len(v) for v in errs.values())
+            self._update_list_item_icon(self.current_file_path,
+                                        "⚠️ توجد أخطاء" if has_errors else "✅ تم التصحيح بالكامل",
+                                        QColor("#e67e22") if has_errors else QColor("#27ae60"))
+        except Exception:
+            pass
 
-# ============================================================
-# الفوتر
-# ============================================================
-st.markdown("---")
-st.markdown("""
-<div style="text-align:center; color:#2a4a6a; font-size:0.82em;
-            line-height:1.8;">
-    📊 المحلل الإحصائي الصادق | بُني بـ Python & Streamlit<br>
-    ⚠️ للأغراض التعليمية والتحليلية فقط ·
-    المقامرة تنطوي على مخاطر مالية حقيقية ·
-    لا تستثمر ما لا تستطيع خسارته
-</div>
-""", unsafe_allow_html=True)
+    def _err_color(self, text):
+        t = text.strip()
+        if t == "":
+            return self.color_empty
+        if "," in t:
+            return self.color_comma
+        try:
+            v = float(t)
+            if v < 0 or v > 10:
+                return self.color_range
+        except ValueError:
+            return self.color_range
+        return QColor("white")
+
+    def color_single_file(self, path, file_data_dict):
+        try:
+            wb = openpyxl.load_workbook(path)
+            fill_empty = PatternFill(fill_type="solid", fgColor="FF7675")
+            fill_comma = PatternFill(fill_type="solid", fgColor="FFEAA7")
+            fill_range = PatternFill(fill_type="solid", fgColor="FAB1A0")
+            fill_clear = PatternFill(fill_type=None)
+            for sname in wb.sheetnames:
+                ws = wb[sname]
+                df = file_data_dict.get(sname)
+                if df is None:
+                    continue
+                mcs = get_mark_cols(df, self.HEADER_ROW)
+                for row_idx in range(self.DATA_ROW, df.shape[0]):
+                    for c in mcs:
+                        cell = ws.cell(row=row_idx + 1, column=c + 1)
+                        val = "" if cell.value is None else str(cell.value).strip()
+                        if val == "":
+                            cell.fill = fill_empty
+                        elif "," in val:
+                            cell.fill = fill_comma
+                        else:
+                            try:
+                                v = float(val)
+                                cell.fill = fill_range if v < 0 or v > 10 else fill_clear
+                            except ValueError:
+                                cell.fill = fill_range
+            wb.save(path)
+        except Exception:
+            return False
+        return True
+
+    def _insert_obs_for_single_file(self, path, data_dict):
+        wb = openpyxl.load_workbook(path)
+        fill_clear = PatternFill(fill_type=None)
+        for sname in wb.sheetnames:
+            ws = wb[sname]
+            df = data_dict.get(sname)
+            if df is None or df.shape[0] <= self.DATA_ROW:
+                continue
+            subj_txt = str(sname)
+            det = detect_subject_type(subj_txt)
+            rules = self.obs_settings.get(det, [])
+            mcs = get_mark_cols(df, self.HEADER_ROW)
+            oc = get_obs_col(df, self.HEADER_ROW)
+            if oc is None:
+                continue
+            for r in range(self.DATA_ROW, df.shape[0]):
+                xl_row = r + 1
+                marks = []
+                for c in mcs:
+                    cell = ws.cell(row=xl_row, column=c + 1)
+                    cell_val = "" if cell.value is None else str(cell.value).strip()
+                    if not cell_val:
+                        continue
+                    cell_val = cell_val.replace(",", ".")
+                    try:
+                        value = float(cell_val)
+                    except Exception:
+                        continue
+                    if 0 <= value <= 10:
+                        marks.append(value)
+                if not marks:
+                    continue
+                avg = sum(marks) / len(marks)
+                obs_text = ""
+                for lo, hi, txt in rules:
+                    if lo <= avg <= hi:
+                        obs_text = txt
+                        break
+                if obs_text:
+                    ws.cell(row=xl_row, column=oc + 1).value = obs_text
+                    ws.cell(row=xl_row, column=oc + 1).fill = fill_clear
+        wb.save(path)
+        return True
+
+    def open_settings(self):
+        d = ObservationSettingsDialog(self, self.obs_settings)
+        if d.exec() == QDialog.DialogCode.Accepted:
+            self.obs_settings = d.get_updated_settings()
+
+
+def main():
+    app = QApplication(sys.argv)
+    app.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+    icon_path = resource_path(os.path.join("img", "001.png"))
+    if os.path.exists(icon_path):
+        app.setWindowIcon(QIcon(icon_path))
+    win = ExcelInspectorApp()
+    win.show()
+    sys.exit(app.exec())
+
+
+if __name__ == "__main__":
+    main()

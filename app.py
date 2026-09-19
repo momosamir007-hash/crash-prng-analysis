@@ -35,8 +35,6 @@ st.markdown("""
 # ==========================================
 # 2. الثوابت وإعدادات الحالة (Session State)
 # ==========================================
-HEADER_ROW = 4
-DATA_ROW = 5
 
 def get_default_settings():
     ar = [
@@ -81,8 +79,27 @@ def detect_subject_type(text):
     if any(k in t for k in ("بدنية", "رياضة", "sport", "eps")): return "الرياضة"
     return "العربية"
 
+def find_header_and_data_rows(df):
+    """دالة ذكية للبحث عن السطر الذي يحتوي على أسماء الأعمدة لتفادي أخطاء اختلاف الملفات"""
+    for i in range(min(15, df.shape[0])):
+        row_vals = [str(x).strip().lower() for x in df.iloc[i].values]
+        if 'matricule' in row_vals or 'obs' in row_vals or 'nom' in row_vals:
+            return i, i + 2 # السطر الإنجليزي (header)، و سطر بداية البيانات
+    return 4, 5 # قيمة افتراضية إذا لم يجد شيئاً
+
+def get_obs_col(df, header_row):
+    obs_keywords = ["obs", "observation", "remarque", "الملاحظة", "ملاحظة", "ملاحظات", "الملاحظات"]
+    for c in range(df.shape[1]):
+        h = str(df.iloc[header_row, c]).strip().lower()
+        if h in obs_keywords:
+            return c
+    return None
+
 def get_mark_cols(df, header_row):
-    excluded = {"", "nan", "nom", "date_n", "matricule", "obs", "prenom"}
+    excluded = {"", "nan", "nom", "date_n", "matricule", "prenom"}
+    obs_keywords = {"obs", "observation", "remarque", "الملاحظة", "ملاحظة", "ملاحظات", "الملاحظات"}
+    excluded.update(obs_keywords)
+    
     mark_cols = []
     for c in range(df.shape[1]):
         h = str(df.iloc[header_row, c]).strip().lower()
@@ -90,26 +107,26 @@ def get_mark_cols(df, header_row):
             mark_cols.append(c)
     return mark_cols
 
-def get_obs_col(df, header_row):
-    for c in range(df.shape[1]):
-        h = str(df.iloc[header_row, c]).strip().lower()
-        if h == "obs":
-            return c
-    return None
-
 def get_file_errors(excel_data_dict):
     report = {}
     total_err_count = 0
     for sname, df in excel_data_dict.items():
-        if df.shape[0] <= DATA_ROW:
+        h_row, d_row = find_header_and_data_rows(df)
+        
+        if df.shape[0] <= d_row:
             continue
-        mark_cols = get_mark_cols(df, HEADER_ROW)
+            
+        mark_cols = get_mark_cols(df, h_row)
+        
+        # لتسمية الأعمدة في التقرير، نستخدم السطر الذي يليه (الذي يحمل الأسماء بالعربية)
+        lbl_row = h_row + 1 if h_row + 1 < df.shape[0] else h_row
+        
         errs = []
-        for r in range(DATA_ROW, df.shape[0]):
+        for r in range(d_row, df.shape[0]):
             for c in mark_cols:
                 raw = df.iloc[r, c]
                 cell_val = str(raw).strip() if pd.notna(raw) else ""
-                col_lbl = str(df.iloc[HEADER_ROW, c]).strip()
+                col_lbl = str(df.iloc[lbl_row, c]).strip()
                 
                 if cell_val == "":
                     errs.append(f"السطر {r+1} | عمود '{col_lbl}': خانة فارغة")
@@ -118,7 +135,7 @@ def get_file_errors(excel_data_dict):
                 else:
                     try:
                         v = float(cell_val)
-                        if v < 0 or v > 10:
+                        if v < 0 or v > 20: 
                             errs.append(f"السطر {r+1} | عمود '{col_lbl}': قيمة خارج النطاق → {cell_val}")
                     except ValueError:
                         errs.append(f"السطر {r+1} | عمود '{col_lbl}': غير رقمي → '{cell_val}'")
@@ -127,14 +144,13 @@ def get_file_errors(excel_data_dict):
     return report, total_err_count
 
 # ==========================================
-# 4. دالة المعالجة والتصحيح
+# 4. دالة المعالجة والتصحيح (الأساسية)
 # ==========================================
 def process_workbook(file_buffer, insert_obs=False):
-    # قراءة الملف بواسطة Pandas لفحص الهيكلة
     xl = pd.ExcelFile(file_buffer)
     data_dict = {s: xl.parse(s, header=None) for s in xl.sheet_names}
     
-    file_buffer.seek(0) # إعادة المؤشر للبداية
+    file_buffer.seek(0)
     wb = openpyxl.load_workbook(file_buffer)
     fill_clear = PatternFill(fill_type=None)
     
@@ -142,16 +158,19 @@ def process_workbook(file_buffer, insert_obs=False):
     for sname in wb.sheetnames:
         ws = wb[sname]
         df = data_dict.get(sname)
-        if df is None or df.shape[0] <= DATA_ROW:
+        
+        h_row, d_row = find_header_and_data_rows(df)
+        
+        if df is None or df.shape[0] <= d_row:
             continue
             
         subj_txt = str(sname)
         det = detect_subject_type(subj_txt)
         rules = st.session_state.obs_settings.get(det, [])
-        mcs = get_mark_cols(df, HEADER_ROW)
-        oc = get_obs_col(df, HEADER_ROW)
+        mcs = get_mark_cols(df, h_row)
+        oc = get_obs_col(df, h_row)
         
-        for r in range(DATA_ROW, df.shape[0]):
+        for r in range(d_row, df.shape[0]):
             xl_row = r + 1
             marks = []
             
@@ -162,33 +181,56 @@ def process_workbook(file_buffer, insert_obs=False):
                 if raw_val is not None:
                     val_str = str(raw_val).strip()
                     corrected = val_str.replace(",", ".")
+                    
                     if corrected != val_str:
-                        cell.value = corrected
+                        # تحويل النص إلى رقم حقيقي قبل حفظه في الإكسيل
+                        try:
+                            num_val = float(corrected)
+                            cell.value = num_val
+                        except:
+                            cell.value = corrected
+                            
                         cell.fill = fill_clear
                         corrections += 1
                         val_str = corrected
                     
                     try:
                         v = float(val_str)
-                        if 0 <= v <= 10:
+                        if 0 <= v <= 20: 
                             marks.append(v)
-                            cell.fill = fill_clear # مسح التلوين الأحمر إن وُجد
+                            cell.fill = fill_clear
                     except ValueError:
                         pass
                         
             # 2. إدراج الملاحظات (التقديرات)
-            if insert_obs and oc is not None and marks:
-                avg = sum(marks) / len(marks)
+            if insert_obs and (oc is not None) and len(marks) > 0:
+                avg = round(sum(marks) / len(marks), 2)
                 obs_text = ""
-                for lo, hi, txt in rules:
-                    if float(lo) <= avg <= float(hi):
-                        obs_text = txt
-                        break
+                
+                for rule in rules:
+                    try:
+                        lo = float(rule[0])
+                        hi = float(rule[1])
+                        txt = str(rule[2])
+                        if lo <= avg <= hi:
+                            obs_text = txt
+                            break
+                    except:
+                        continue
+                
+                # إذا لم يجد ملاحظة بسبب الثغرات، نعطيه أقرب ملاحظة
+                if not obs_text and rules:
+                    for rule in rules:
+                        if avg < float(rule[0]):
+                            obs_text = str(rule[2])
+                            break
+                    if not obs_text:
+                        obs_text = str(rules[-1][2])
+
                 if obs_text:
                     ws.cell(row=xl_row, column=oc + 1).value = obs_text
                     ws.cell(row=xl_row, column=oc + 1).fill = fill_clear
                     
-    # حفظ الملف في الذاكرة
     output = io.BytesIO()
     wb.save(output)
     output.seek(0)
@@ -246,7 +288,7 @@ with tab_main:
 
         with col2:
             if st.button("✨ تصحيح آلي + إدراج الملاحظات", type="primary", use_container_width=True):
-                with st.spinner('جاري معالجة الملفات...'):
+                with st.spinner('جاري معالجة الملفات وحقن الملاحظات...'):
                     processed_dict = {}
                     total_corrections = 0
                     for file in uploaded_files:
@@ -255,15 +297,14 @@ with tab_main:
                         total_corrections += corrections
                         
                     st.session_state.processed_files = processed_dict
-                    st.success(f"✅ تمت المعالجة بنجاح! تم إجراء {total_corrections} تصحيح.")
+                    st.success(f"✅ تمت المعالجة بنجاح! تم إجراء {total_corrections} تصحيح وإدراج الملاحظات.")
 
-        # إذا تم معالجة الملفات، نعرض زر تحميل النتيجة كملف ZIP
         if st.session_state.processed_files:
             st.markdown("### 📥 تحميل الملفات المصححة")
             zip_buffer = io.BytesIO()
             with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
                 for fname, fbuffer in st.session_state.processed_files.items():
-                    zip_file.writestr(f"مصحح_{fname}", fbuffer.getvalue())
+                    zip_file.writestr(f"{fname}", fbuffer.getvalue()) # حفظ الملف بنفس الاسم الأصلي داخل الملف المضغوط
             
             st.download_button(
                 label="📦 تحميل جميع الملفات (ZIP)",
@@ -281,7 +322,6 @@ with tab_settings:
     settings = st.session_state.obs_settings
     subjects = list(settings.keys())
     
-    # تحويل البيانات إلى Pandas DataFrames لتسهيل التعديل
     edited_settings = {}
     cols = st.columns(2)
     

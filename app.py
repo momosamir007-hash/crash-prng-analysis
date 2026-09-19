@@ -73,14 +73,15 @@ if 'processed_files' not in st.session_state:
 # 3. الدوال المساعدة الأساسية
 # ==========================================
 def detect_subject_type(text):
+    """التعرف على نوع المادة من خلال النص المستخرج"""
     t = str(text).lower()
     if any(k in t for k in ("فرنسية", "français", "fr")): return "الفرنسية"
-    if any(k in t for k in ("انجليزية", "anglais", "ang")): return "الانجليزية"
+    if any(k in t for k in ("نجليزي", "anglais", "ang")): return "الانجليزية"
     if any(k in t for k in ("بدنية", "رياضة", "sport", "eps")): return "الرياضة"
     return "العربية"
 
 def find_header_and_data_rows(df):
-    """دالة ذكية للبحث عن السطر الذي يحتوي على أسماء الأعمدة لتفادي أخطاء اختلاف الملفات"""
+    """دالة للبحث عن السطر الذي يحتوي على أسماء الأعمدة لتفادي أخطاء اختلاف الملفات"""
     for i in range(min(15, df.shape[0])):
         row_vals = [str(x).strip().lower() for x in df.iloc[i].values]
         if 'matricule' in row_vals or 'obs' in row_vals or 'nom' in row_vals:
@@ -164,7 +165,13 @@ def process_workbook(file_buffer, insert_obs=False):
         if df is None or df.shape[0] <= d_row:
             continue
             
-        subj_txt = str(sname)
+        # استخراج اسم المادة من محتوى الملف (السطر الخامس) للحصول على دقة أعلى
+        try:
+            subj_txt = str(df.iloc[4, 0])
+            subj_txt += " " + str(sname) # دمج اسم الشيت كإجراء احتياطي
+        except:
+            subj_txt = str(sname)
+            
         det = detect_subject_type(subj_txt)
         rules = st.session_state.obs_settings.get(det, [])
         mcs = get_mark_cols(df, h_row)
@@ -304,7 +311,7 @@ with tab_main:
             zip_buffer = io.BytesIO()
             with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
                 for fname, fbuffer in st.session_state.processed_files.items():
-                    zip_file.writestr(f"{fname}", fbuffer.getvalue()) # حفظ الملف بنفس الاسم الأصلي داخل الملف المضغوط
+                    zip_file.writestr(f"{fname}", fbuffer.getvalue())
             
             st.download_button(
                 label="📦 تحميل جميع الملفات (ZIP)",
